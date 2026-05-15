@@ -7,11 +7,16 @@
 
 # ── 代码本体（自带 Git 仓库，hermes update 管理） ─────────────────────────
 hermes-agent/
+hermes-webui/
 
 # ── 敏感凭证（绝不能进版本控制） ──────────────────────────────────────────
 .env
 auth.json
-auth.lock
+
+# ── 锁文件 / PID（运行时进程状态） ────────────────────────────────────────
+*.lock
+*.pid
+.clean_shutdown
 
 # ── SQLite 数据库（二进制 + WAL，频繁变动） ───────────────────────────────
 state.db
@@ -28,28 +33,27 @@ webui/_turn_journal/
 
 # ── 日志 ─────────────────────────────────────────────────────────────────
 logs/
-webui.log
 
-# ── 运行时状态 / 锁文件 / PID ────────────────────────────────────────────
-webui.pid
+# ── 运行时状态 ──────────────────────────────────────────────────────────
 webui.ctl.env
-.clean_shutdown
-cron/.tick.lock
 cron/output/
 .update_check
+state-snapshots/
 
 # ── 缓存 ────────────────────────────────────────────────────────────────
 cache/
 audio_cache/
 image_cache/
-webui/models_cache.json
 sandboxes/
+*cache.json
+*snapshot.json
 
 # ── Gateway 运行时状态 ───────────────────────────────────────────────────
 gateway_state.json
 channel_directory.json
 discord_threads.json
 gateway/
+gateway.*
 
 # ── 二进制 ──────────────────────────────────────────────────────────────
 bin/
@@ -59,4 +63,11 @@ bin/
 skills/
 
 # ── WebUI 运行时数据 ─────────────────────────────────────────────────────
-webui/last_workspace.txt
+webui/
+webui.*
+
+# ── 备份 / 历史 / 客户端配置 ──────────────────────────────────────────────
+backups/
+.hermes_history
+.claude/
+lsp/
