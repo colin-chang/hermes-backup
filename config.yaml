@@ -1,0 +1,194 @@
+model:
+  default: z-ai/glm-5.1
+  provider: custom
+  base_url: https://zenmux.ai/api/v1
+  api_key: ${ZENMUX_API_KEY}
+
+custom_providers:
+  - name: Zenmux.ai
+    base_url: https://zenmux.ai/api/v1
+    api_key: ${ZENMUX_API_KEY}
+    model: z-ai/glm-5.1
+
+# ── 智能体 ──────────────────────────────────────────────────
+agent:
+  max_turns: 90
+  gateway_timeout: 1800
+
+# ── 终端 ────────────────────────────────────────────────────
+terminal:
+  backend: local
+  timeout: 600
+  persistent_shell: true
+
+# ── 网页搜索 ────────────────────────────────────────────────
+web:
+  backend: brave
+
+# ── 浏览器 ──────────────────────────────────────────────────
+browser:
+  inactivity_timeout: 120
+
+# ── 显示 ────────────────────────────────────────────────────
+display:
+  personality: kawaii
+  busy_input_mode: interrupt
+  show_cost: true
+  language: zh
+  tui_status_indicator: kaomoji
+  interim_assistant_messages: true
+  persistent_output: true
+  inline_diffs: true
+  file_mutation_verifier: true
+  tool_progress: all
+  background_process_notifications: all
+
+# ── 语音转文字 / 文字转语音 ─────────────────────────────────
+stt:
+  enabled: true
+  provider: local
+  local:
+    model: base
+
+tts:
+  provider: edge
+  edge:
+    voice: en-US-AriaNeural
+
+# ── 记忆 ────────────────────────────────────────────────────
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+
+# ── 子代理委派 ──────────────────────────────────────────────
+delegation:
+  inherit_mcp_toolsets: true
+  max_iterations: 50
+  child_timeout_seconds: 600
+  max_concurrent_children: 3
+  max_spawn_depth: 1
+  orchestrator_enabled: true
+
+# ── 安全 ────────────────────────────────────────────────────
+security:
+  redact_secrets: true
+  tirith_enabled: true
+  tirith_fail_open: true
+
+# ── 命令审批 ────────────────────────────────────────────────
+approvals:
+  mode: smart
+  cron_mode: deny
+  mcp_reload_confirm: true
+
+# ── 会话 ────────────────────────────────────────────────────
+sessions:
+  auto_prune: true
+  retention_days: 90
+  vacuum_after_prune: true
+
+# ── 技能管家 ────────────────────────────────────────────────
+curator:
+  enabled: true
+  interval_hours: 168
+  backup:
+    enabled: true
+    keep: 5
+
+# ── 更新 ────────────────────────────────────────────────────
+updates:
+  pre_update_backup: true
+
+# ── Discord ─────────────────────────────────────────────────
+discord:
+  require_mention: true
+  auto_thread: true
+  history_backfill: true
+  reactions: true
+
+# ── Telegram ────────────────────────────────────────────────
+telegram:
+  reactions: false
+
+# ── 时区 ────────────────────────────────────────────────────
+timezone: Asia/Shanghai
+
+# ── 日志 ────────────────────────────────────────────────────
+logging:
+  level: INFO
+
+# ── 语言服务协议 ────────────────────────────────────────────
+lsp:
+  enabled: true
+
+# ── 看板 ────────────────────────────────────────────────────
+kanban:
+  dispatch_in_gateway: true
+
+# ── 代码执行 ────────────────────────────────────────────────
+code_execution:
+  mode: project
+
+# ── 引导完成标记 ────────────────────────────────────────────
+onboarding:
+  seen:
+    openclaw_residue_cleanup: true
+
+# ── 平台工具集 ──────────────────────────────────────────────
+platform_toolsets:
+  cli:
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - messaging
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+  telegram:
+    - hermes-telegram
+  discord:
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - messaging
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+  whatsapp:
+    - hermes-whatsapp
+  slack:
+    - hermes-slack
+  signal:
+    - hermes-signal
+  homeassistant:
+    - hermes-homeassistant
+  qqbot:
+    - hermes-qqbot
+  yuanbao:
+    - hermes-yuanbao
+  teams:
+    - hermes-teams
+  google_chat:
+    - hermes-google_chat
+
+_config_version: 23
