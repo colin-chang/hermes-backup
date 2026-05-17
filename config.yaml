@@ -1,230 +1,231 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Hermes Agent 配置文件
+# 仅保留自定义配置，运行时自动与内置默认值合并
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── 核心模型 ──────────────────────────────────────────────────────────
 model:
   provider: custom:zenmux
-  default: z-ai/glm-5.1
+  default: deepseek/deepseek-v4-pro
+
+# ── 辅助模型（均走 ZenMux）──────────────────────────────────────────
 auxiliary:
   vision:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-    timeout: 120
-    download_timeout: 30
   web_extract:
     provider: custom:zenmux
     model: minimax/minimax-m2.7
-    timeout: 360
   compression:
     provider: custom:zenmux
-    model: minimax/minimax-m2.7
-    timeout: 120
+    model: deepseek/deepseek-v4-pro
   session_search:
     provider: custom:zenmux
     model: minimax/minimax-m2.7
-    timeout: 30
-    max_concurrency: 3
   skills_hub:
     provider: custom:zenmux
     model: minimax/minimax-m2.7
-    timeout: 30
   approval:
     provider: custom:zenmux
-    model: minimax/minimax-m2.7
-    timeout: 30
+    model: google/gemini-3.1-flash-lite
   mcp:
     provider: custom:zenmux
-    model: z-ai/glm-5.1
-    timeout: 30
+    model: minimax/minimax-m2.7
   title_generation:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-    timeout: 30
   triage_specifier:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-    timeout: 120
   curator:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-    timeout: 600
+
+# ── 自定义主力模型商（Zenmux）──────────────────────────────────────────────
 custom_providers:
   - name: zenmux
     base_url: https://zenmux.ai/api/v1
     api_key: ${ZENMUX_API_KEY}
-    models: # ── 常用模型白名单（模型选择器只列出这些，不拉线上全量目录）──
-      minimax/minimax-m2.7:
+    models:
+      google/gemini-3.1-flash-lite: # 0.25 Multimodal
+        context_length: 1050000
+      minimax/minimax-m2.7: #0.3
         context_length: 204800
-      volcengine/doubao-seed-2.0-pro:
-        context_length: 256000
-      moonshotai/kimi-k2.6:
-        context_length: 262140
-      z-ai/glm-5.1:
-        context_length: 200000
-      qwen/qwen3.6-max-preview:
-        context_length: 262140
-      google/gemini-3.1-flash-lite:
-        context_length: 1050000
-      google/gemini-3.1-pro-preview:
-        context_length: 1050000
-      google/gemini-3.1-flash-image-preview:
-        context_length: 65540
-      openai/gpt-5.3-codex:
-        context_length: 400000
-      openai/gpt-5.4-mini:
-        context_length: 400000
-      openai/gpt-5.5:
-        context_length: 1050000
-      openai/gpt-5.5-pro:
-        context_length: 400000
-      anthropic/claude-sonnet-4.6:
+      deepseek/deepseek-v4-pro: # 0.435
         context_length: 1000000
-      anthropic/claude-opus-4.7:
-      context_length: 1000000
+      volcengine/doubao-seed-2.0-pro: # 0.45 Multimodal
+        context_length: 256000
+      z-ai/glm-5.1: # 0.88
+        context_length: 200000
+      moonshotai/kimi-k2.6: # 0.95 Multimodal
+        context_length: 262140
+      qwen/qwen3.6-max-preview: # 1.3
+        context_length: 262140
+      openai/gpt-5.3-codex: # 1.75 Multimodal
+        context_length: 400000
+      google/gemini-3.1-pro-preview: # 2 Multimodal
+        context_length: 1050000
+      anthropic/claude-sonnet-4.6: # 3 Multimodal
+        context_length: 1000000
+      anthropic/claude-opus-4.7: # 5 Multimodal
+        context_length: 1000000
+      openai/gpt-5.5: # 5 Multimodal
+        context_length: 1050000
+      openai/gpt-5.5-pro: # 30 Multimodal
+        context_length: 400000
+
+# ── 备用模型商（Fallback）──────────────────────────────────────────────
+# 主提供商不可用时自动故障转移，按顺序尝试，429/529/503/连接失败时触发
+fallback_providers:
+           # 本地 Ollama 服务的共用锚点
+  - &ollama
+    provider: ollama
+    model: qwen3.5
+    base_url: http://localhost:11434/v1
+    api_key: ollama
+  - <<: *ollama
+    model: qwen2.5-coder
+
+# ── 智能体行为 ───────────────────────────────────────────────────────
 agent:
-  max_turns: 90
-  gateway_timeout: 1800
+  max_turns: 180  # 默认 90
+
 terminal:
-  backend: local
-  timeout: 600
-  persistent_shell: true
+  timeout: 600  # 默认 180
+
 web:
-  backend: brave
-browser:
-  inactivity_timeout: 120
+  backend: brave-free  # 默认空
+
+approvals:
+  mode: smart  # 默认 manual，智能审批低风险命令
+
+  destructive_slash_confirm: false
+cron:
+  wrap_response: false  # 默认 true
+
+sessions:
+  auto_prune: true  # 默认 false
+
+updates:
+  pre_update_backup: true  # 默认 false
+
+# ── Discord（唯一已配置的平台）──────────────────────────────────────
+discord:
+  auto_thread: false  # 默认 true
+  thread_require_mention: true  # 默认 false
+  gateway_restart_notification: false  # 非默认字段，抑制重启通知
+
+# ── 显示与交互 ───────────────────────────────────────────────────────
 display:
-  personality: kawaii
-  busy_input_mode: interrupt
-  show_cost: true
-  language: zh
-  tui_status_indicator: kaomoji
-  interim_assistant_messages: true
-  bell_on_complete: true
-  streaming: true
-  persistent_output: true
-  inline_diffs: true
-  file_mutation_verifier: true
-  tool_progress: all
-  background_process_notifications: all
+  language: zh  # 默认 en
+  streaming: true  # 默认 false
+  bell_on_complete: true  # 默认 false
+  show_cost: true  # 默认 false
+  background_process_notifications: all  # 默认未设置
+  tool_progress: all  # 默认未设置
+
+privacy:
+  redact_pii: true  # 默认 false
+
+# ── 媒体生成 ─────────────────────────────────────────────────────────
+image_gen:
+  provider: zenmux
+  zenmux:
+    model: openai/gpt-image-2
+
+video_gen:
+  provider: zenmux-video
+  model: google/veo-3.1-fast-generate-001
+
+# ── 流式输出 ─────────────────────────────────────────────────────────
 streaming:
   enabled: true
   transport: edit
   edit_interval: 0.3
   buffer_threshold: 40
   fresh_final_after_seconds: 60
-stt:
-  enabled: true
-  provider: local
-  local:
-    model: base
-tts:
-  provider: edge
-  edge:
-    voice: en-US-AriaNeural
-memory:
-  memory_enabled: true
-  user_profile_enabled: true
-delegation:
-  inherit_mcp_toolsets: true
-  max_iterations: 50
-  child_timeout_seconds: 600
-  max_concurrent_children: 3
-  max_spawn_depth: 1
-  orchestrator_enabled: true
-security:
-  redact_secrets: true
-  tirith_enabled: true
-  tirith_fail_open: true
-approvals:
-  mode: smart
-  cron_mode: deny
-  mcp_reload_confirm: true
-sessions:
-  auto_prune: true
-  retention_days: 90
-  vacuum_after_prune: true
+
+# ── 插件 ─────────────────────────────────────────────────────────────
+plugins:
+  enabled:
+    - zenmux-image
+    - zenmux-video
+
+# ── 技能管理 ─────────────────────────────────────────────────────────
 curator:
-  enabled: true
-  interval_hours: 168
   backup:
-    enabled: true
-    keep: 5
-updates:
-  pre_update_backup: true
-discord:
-  require_mention: true
-  thread_require_mention: true
-  auto_thread: false
-  history_backfill: true
-  reactions: true
-  gateway_restart_notification: false
-telegram:
-  reactions: false
-timezone: Asia/Shanghai
-logging:
-  level: INFO
-lsp:
-  enabled: true
-kanban:
-  dispatch_in_gateway: true
-code_execution:
-  mode: project
+    keep: 3  # 默认 5
+
 onboarding:
   seen:
     openclaw_residue_cleanup: true
+    tool_progress_prompt: true
+
+# ── MCP 服务器 ───────────────────────────────────────────────────────
+mcp_servers:
+  bb-browser:
+    command: npx
+    args:
+      - -y
+      - bb-browser
+      - --mcp
+
+# ── 平台工具集 ───────────────────────────────────────────────────────
 platform_toolsets:
   cli:
-  - browser
-  - clarify
-  - code_execution
-  - computer_use
-  - cronjob
-  - delegation
-  - file
-  - image_gen
-  - memory
-  - messaging
-  - session_search
-  - skills
-  - terminal
-  - todo
-  - tts
-  - vision
-  - web
-  telegram:
-  - hermes-telegram
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - messaging
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
   discord:
-  - browser
-  - clarify
-  - code_execution
-  - computer_use
-  - cronjob
-  - delegation
-  - file
-  - image_gen
-  - memory
-  - messaging
-  - session_search
-  - skills
-  - terminal
-  - todo
-  - tts
-  - vision
-  - web
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - messaging
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+  telegram:
+    - hermes-telegram
   whatsapp:
-  - hermes-whatsapp
+    - hermes-whatsapp
   slack:
-  - hermes-slack
+    - hermes-slack
   signal:
-  - hermes-signal
+    - hermes-signal
   homeassistant:
-  - hermes-homeassistant
+    - hermes-homeassistant
   qqbot:
-  - hermes-qqbot
+    - hermes-qqbot
   yuanbao:
-  - hermes-yuanbao
+    - hermes-yuanbao
   teams:
-  - hermes-teams
+    - hermes-teams
   google_chat:
-  - hermes-google_chat
-cron:
-  wrap_response: false
-privacy:
-  redact_pii: true
-_config_version: 23
+    - hermes-google_chat
+
+# ── 时区 ─────────────────────────────────────────────────────────────
+timezone: Asia/Shanghai

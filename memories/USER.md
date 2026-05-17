@@ -40,7 +40,7 @@ _Learn about the person you're helping. Update this as you go._
 §
 Context: 核心关注：日常事务高效处理、工作辅助到位、跨地区事务衔接顺畅，同时兼顾科技教程内容优质产出与加拿大移居相关事务。
 §
-Context: 正在推进的项目：各类 Homelab 搭建、AI 工具集成开发、科技教程脚本撰写与拍摄，需要助理协助处理基础事务、素材整理、进度提醒。
+老婆的 iMessage: chenjieyu.swufe@gmail.com | 大哥自己的 iMessage: colinchang.zc@gmail.com
 §
 Context: 反感内容：低效的事务处理、遗漏重要事项、泄露敏感信息、过度生硬的沟通、未授权的操作。
 §

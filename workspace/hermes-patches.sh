@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-# Hermes Patches — 手动修复兼容 custom:<name> 聚合器的 patch 管理脚本
+# Hermes Patches — 手动修复脚本
 # ═══════════════════════════════════════════════════════════════════════════
 #
 # 背景：
 #   当 hermes-agent 上游版本更新后，本地修改会被覆盖，
-#   此脚本用于一键还原以下 4 个文件的修改：
+#   此脚本用于一键还原以下 5 类 7 处 patch。
 #
-# hermes-agent (5 处):
-#   1. hermes_cli/providers.py    — is_aggregator() 识别 custom:<name>
-#   2. hermes_cli/doctor.py        — 消除 vendor-prefix 假阳性警告
-#   3. hermes_cli/model_switch.py  — models: 白名单优先于线上拉取（2 处）
-#   4. gateway/config.py           — gateway_restart_notification bridge 缺失修复（2 处）
+#   1. hermes_cli/providers.py   — is_aggregator() 识别 custom:<name>
+#   2. hermes_cli/doctor.py      — 消除 vendor-prefix 假阳性警告
+#   3. hermes_cli/model_switch.py — models: 白名单优先于线上拉取（2 处）
+#   4. gateway/config.py          — gateway_restart_notification bridge 修复（2 处）
+#   5. cron/jobs.py               — json.dump ensure_ascii=False，避免中文变 \uXXXX
 #
 # 使用方法：
-#   ./hermes-patches.sh check    # 检查当前状态（是否需要重新应用）
-#   ./hermes-patches.sh apply    # 应用 patch
-#   ./hermes-patches.sh status   # 显示各文件修改状态
+#   ./hermes-patches.sh check   # 检查当前状态（默认）
+#   ./hermes-patches.sh apply   # 应用所有 patch
+#   ./hermes-patches.sh status  # 同 check
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -24,32 +24,78 @@ set -euo pipefail
 
 AGENT_DIR="${HOME}/.hermes/hermes-agent"
 
-# ── 颜色 ────────────────────────────────────────────────────────────────────
+# ── 颜色 ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-info()    { echo -e "${CYAN}[INFO]${NC}  $1"; }
-ok()      { echo -e "${GREEN}[OK]${NC}    $1"; }
-warn()    { echo -e "${YELLOW}[WARN]${NC}  $1"; }
-error()   { echo -e "${RED}[ERROR]${NC} $1"; }
+info()   { echo -e "${CYAN}[INFO]${NC}  $1"; }
+ok()     { echo -e "${GREEN}[OK]${NC}    $1"; }
+warn()   { echo -e "${YELLOW}[WARN]${NC}  $1"; }
+error()  { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# ── patch 内容（内嵌，避免依赖外部文件）────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# Patch 注册表 — 单一数据源，apply 和 status 共用
+# 格式: "file_rel_path | label | check_grep_pattern"
+# ═══════════════════════════════════════════════════════════════════════════
 
-apply_hermes_agent() {
+_patch_registry=(
+    "hermes_cli/providers.py|providers.py (is_aggregator)|startswith.*\"custom:\""
+    "hermes_cli/doctor.py|doctor.py (vendor-prefix)|startswith.*\"custom:\""
+    "hermes_cli/model_switch.py|model_switch.py (Section 3)|and not models_list"
+    "hermes_cli/model_switch.py|model_switch.py (Section 4)|if not grp\[\"models\"\]"
+    "gateway/config.py|config.py (bridge loop)|\"gateway_restart_notification\" in platform_cfg"
+    "gateway/config.py|config.py (from_dict fallback)|_grn = data.get.*gateway_restart_notification"
+    "cron/jobs.py|jobs.py (ensure_ascii=False)|ensure_ascii=False"
+)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 辅助函数
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 执行一个 Python 替换 patch。
+# 使用: _do_patch <file_rel> <label> <check_grep> <<'PYEOF' ... PYEOF
+#   heredoc 必须是完整的 Python 脚本，用 sys.argv[1] 获取文件路径，
+#   输出 "APPLIED" 或 "SKIP"。
+#   返回 0 = 已应用或成功；返回 1 = 文件不存在或失败
+_do_patch() {
+    local file="${AGENT_DIR}/$1"
+    local label="$2"
+    local check="$3"
+
+    if [[ ! -f "$file" ]]; then
+        error "${1} 不存在，跳过"
+        return 1
+    fi
+    if grep -q "$check" "$file" 2>/dev/null; then
+        ok "$label — 已应用，跳过"
+        return 0
+    fi
+
+    python3 - "$file"
+    local rc=$?
+    if [[ $rc -eq 0 ]]; then
+        ok "$label — 已应用"
+    else
+        error "$label — 应用失败"
+    fi
+    return $rc
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# apply_all — 应用所有 patch
+# ═══════════════════════════════════════════════════════════════════════════
+
+apply_all() {
     info "正在应用 hermes-agent patches..."
 
-    # 1. hermes_cli/providers.py — is_aggregator()
-    local providers_file="${AGENT_DIR}/hermes_cli/providers.py"
-    if [[ -f "$providers_file" ]]; then
-        if grep -q 'startswith.*"custom:"' "$providers_file" 2>/dev/null; then
-            ok "hermes_cli/providers.py — 已应用，跳过"
-        else
-            python3 - "$providers_file" <<'PYEOF'
+    # ── 1. providers.py ───────────────────────────────────────────────────
+    _do_patch "hermes_cli/providers.py" \
+        "providers.py (is_aggregator)" \
+        'startswith.*"custom:"' <<'PYEOF'
 import sys
-
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
@@ -74,25 +120,12 @@ if old in content:
 else:
     print("SKIP")
 PYEOF
-            if [[ $? -eq 0 ]]; then
-                ok "hermes_cli/providers.py — 已应用"
-            else
-                error "hermes_cli/providers.py — 应用失败"
-            fi
-        fi
-    else
-        error "hermes_cli/providers.py 不存在，跳过"
-    fi
 
-    # 2. hermes_cli/doctor.py — vendor-prefix check
-    local doctor_file="${AGENT_DIR}/hermes_cli/doctor.py"
-    if [[ -f "$doctor_file" ]]; then
-        if grep -q 'startswith.*"custom:"' "$doctor_file" 2>/dev/null; then
-            ok "hermes_cli/doctor.py — 已应用，跳过"
-        else
-            python3 - "$doctor_file" <<'PYEOF'
+    # ── 2. doctor.py ──────────────────────────────────────────────────────
+    _do_patch "hermes_cli/doctor.py" \
+        "doctor.py (vendor-prefix)" \
+        'startswith.*"custom:"' <<'PYEOF'
 import sys
-
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
@@ -114,26 +147,19 @@ if old in content:
 else:
     print("SKIP")
 PYEOF
-            if [[ $? -eq 0 ]]; then
-                ok "hermes_cli/doctor.py — 已应用"
-            else
-                error "hermes_cli/doctor.py — 应用失败"
-            fi
-        fi
+
+    # ── 3. model_switch.py (两处) ─────────────────────────────────────────
+    local sw_file="${AGENT_DIR}/hermes_cli/model_switch.py"
+    if [[ ! -f "$sw_file" ]]; then
+        error "hermes_cli/model_switch.py 不存在，跳过"
     else
-        error "hermes_cli/doctor.py 不存在，跳过"
-    fi
+        local sw_ok=0
 
-    # 3. hermes_cli/model_switch.py — 两处修改
-    local switch_file="${AGENT_DIR}/hermes_cli/model_switch.py"
-    if [[ -f "$switch_file" ]]; then
-        local applied=0
-
-        # 3a. Section 3: user providers (models_list 非空时跳过线上拉取)
-        if ! grep -q 'and not models_list' "$switch_file" 2>/dev/null; then
-            python3 - "$switch_file" <<'PYEOF'
+        # 3a. Section 3: user providers
+        _do_patch "hermes_cli/model_switch.py" \
+            "model_switch.py (Section 3)" \
+            'and not models_list' <<'PYEOF'
 import sys
-
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
@@ -169,22 +195,17 @@ if old in content:
     content = content.replace(old, new)
     with open(file_path, 'w') as f:
         f.write(content)
-    print("APPLIED_A")
+    print("APPLIED")
 else:
-    print("SKIP_A")
+    print("SKIP")
 PYEOF
-            if [[ $? -eq 0 ]]; then
-                applied=$((applied + 1))
-            fi
-        else
-            ok "hermes_cli/model_switch.py (Section 3) — 已应用，跳过"
-        fi
+        [[ $? -eq 0 ]] && sw_ok=$((sw_ok + 1))
 
-        # 3b. Section 4: custom_providers (grp["models"] 非空时跳过线上拉取)
-        if ! grep -q 'if not grp\["models"\] and api_url and api_key' "$switch_file" 2>/dev/null; then
-            python3 - "$switch_file" <<'PYEOF'
+        # 3b. Section 4: custom_providers
+        _do_patch "hermes_cli/model_switch.py" \
+            "model_switch.py (Section 4)" \
+            'if not grp\["models"\]' <<'PYEOF'
 import sys
-
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
@@ -202,39 +223,27 @@ if old in content:
     content = content.replace(old, new)
     with open(file_path, 'w') as f:
         f.write(content)
-    print("APPLIED_B")
+    print("APPLIED")
 else:
-    print("SKIP_B")
+    print("SKIP")
 PYEOF
-            if [[ $? -eq 0 ]]; then
-                applied=$((applied + 1))
-            fi
-        else
-            ok "hermes_cli/model_switch.py (Section 4) — 已应用，跳过"
-        fi
+        [[ $? -eq 0 ]] && sw_ok=$((sw_ok + 1))
 
-        if [[ $applied -gt 0 ]]; then
-            ok "hermes_cli/model_switch.py — 已应用"
-        fi
-    else
-        error "hermes_cli/model_switch.py 不存在，跳过"
+        [[ $sw_ok -gt 0 ]] && ok "model_switch.py — 已应用"
     fi
 
-    # 4. gateway/config.py — gateway_restart_notification bridge 缺失修复
-    #    Bug: config.yaml 中 discord:/telegram: 的 gateway_restart_notification 设置
-    #    被静默忽略，因为：(a) bridging 循环遗漏了该 key；(b) from_dict() 不从 extra fallback。
-    #    详见 PR: https://github.com/NousResearch/hermes-agent/pull/26896
-    local config_file="${AGENT_DIR}/gateway/config.py"
-    if [[ -f "$config_file" ]]; then
-        local config_applied=0
+    # ── 4. gateway/config.py (两处) ───────────────────────────────────────
+    local cf_file="${AGENT_DIR}/gateway/config.py"
+    if [[ ! -f "$cf_file" ]]; then
+        error "gateway/config.py 不存在，跳过"
+    else
+        local cf_ok=0
 
-        # 4a. bridging 循环：添加 gateway_restart_notification 到 bridge 列表
-        if grep -q '"gateway_restart_notification" in platform_cfg' "$config_file" 2>/dev/null; then
-            ok "gateway/config.py (bridge 循环) — 已应用，跳过"
-        else
-            python3 - "$config_file" <<'PYEOF'
+        # 4a. bridging 循环中 bridge gateway_restart_notification
+        _do_patch "gateway/config.py" \
+            "config.py (bridge loop)" \
+            '"gateway_restart_notification" in platform_cfg' <<'PYEOF'
 import sys
-
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
@@ -261,22 +270,17 @@ if old in content:
     content = content.replace(old, new)
     with open(file_path, 'w') as f:
         f.write(content)
-    print("APPLIED_A")
+    print("APPLIED")
 else:
-    print("SKIP_A")
+    print("SKIP")
 PYEOF
-            if [[ $? -eq 0 ]]; then
-                config_applied=$((config_applied + 1))
-            fi
-        fi
+        [[ $? -eq 0 ]] && cf_ok=$((cf_ok + 1))
 
-        # 4b. PlatformConfig.from_dict(): 从 extra fallback 读取 gateway_restart_notification
-        if grep -q '_grn = data.get.*gateway_restart_notification' "$config_file" 2>/dev/null; then
-            ok "gateway/config.py (from_dict extra fallback) — 已应用，跳过"
-        else
-            python3 - "$config_file" <<'PYEOF'
+        # 4b. from_dict() 从 extra fallback 读取
+        _do_patch "gateway/config.py" \
+            "config.py (from_dict fallback)" \
+            '_grn = data.get.*gateway_restart_notification' <<'PYEOF'
 import sys
-
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
@@ -315,22 +319,43 @@ if old in content:
     content = content.replace(old, new)
     with open(file_path, 'w') as f:
         f.write(content)
-    print("APPLIED_B")
+    print("APPLIED")
 else:
-    print("SKIP_B")
+    print("SKIP")
 PYEOF
-            if [[ $? -eq 0 ]]; then
-                config_applied=$((config_applied + 1))
-            fi
-        fi
+        [[ $? -eq 0 ]] && cf_ok=$((cf_ok + 1))
 
-        if [[ $config_applied -gt 0 ]]; then
-            ok "gateway/config.py — 已应用"
-        fi
-    else
-        error "gateway/config.py 不存在，跳过"
+        [[ $cf_ok -gt 0 ]] && ok "gateway/config.py — 已应用"
     fi
+
+    # ── 5. cron/jobs.py ───────────────────────────────────────────────────
+    _do_patch "cron/jobs.py" \
+        "cron/jobs.py (ensure_ascii=False)" \
+        'ensure_ascii=False' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+old = '''            json.dump({"jobs": jobs, "updated_at": _hermes_now().isoformat()}, f, indent=2)
+            f.flush()'''
+
+new = '''            json.dump({"jobs": jobs, "updated_at": _hermes_now().isoformat()}, f, indent=2, ensure_ascii=False)
+            f.flush()'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# show_status — 检查所有 patch 状态（从注册表驱动，无一遗漏）
+# ═══════════════════════════════════════════════════════════════════════════
 
 show_status() {
     echo ""
@@ -339,16 +364,16 @@ show_status() {
     echo "═══════════════════════════════════════════════════"
     echo ""
 
-    local total=0
-    local applied=0
+    local total=0 applied=0
 
-    check_patch() {
-        local label="$1"
-        local file="$2"
-        local pattern="$3"
+    for entry in "${_patch_registry[@]}"; do
+        local file_rel="${entry%%|*}" rest="${entry#*|}"
+        local label="${rest%%|*}"  check="${rest#*|}"
+        local file="${AGENT_DIR}/${file_rel}"
+
         total=$((total + 1))
         if [[ -f "$file" ]]; then
-            if grep -q "$pattern" "$file" 2>/dev/null; then
+            if grep -q "$check" "$file" 2>/dev/null; then
                 echo -e "  ${GREEN}✓${NC} ${label}"
                 applied=$((applied + 1))
             else
@@ -357,31 +382,7 @@ show_status() {
         else
             echo -e "  ${YELLOW}?${NC} ${label} — 文件不存在"
         fi
-    }
-
-    check_patch "hermes-agent: providers.py (is_aggregator)" \
-        "${AGENT_DIR}/hermes_cli/providers.py" \
-        'startswith.*"custom:"'
-
-    check_patch "hermes-agent: doctor.py (vendor-prefix check)" \
-        "${AGENT_DIR}/hermes_cli/doctor.py" \
-        'startswith.*"custom:"'
-
-    check_patch "hermes-agent: model_switch.py (Section 3: models 白名单)" \
-        "${AGENT_DIR}/hermes_cli/model_switch.py" \
-        'and not models_list'
-
-    check_patch "hermes-agent: model_switch.py (Section 4: grp 白名单)" \
-        "${AGENT_DIR}/hermes_cli/model_switch.py" \
-        'if not grp\["models"\]'
-
-    check_patch "hermes-agent: config.py (bridge: gateway_restart_notification)" \
-        "${AGENT_DIR}/gateway/config.py" \
-        '"gateway_restart_notification" in platform_cfg'
-
-    check_patch "hermes-agent: config.py (from_dict: extra fallback)" \
-        "${AGENT_DIR}/gateway/config.py" \
-        '_grn = data.get.*gateway_restart_notification'
+    done
 
     echo ""
     echo "───────────────────────────────────────────────────"
@@ -391,17 +392,16 @@ show_status() {
 
     if [[ $applied -eq $total ]]; then
         ok "所有 patches 已应用，无需重新应用"
-        return 0
     elif [[ $applied -eq 0 ]]; then
         warn "所有 patches 未应用，建议执行: $0 apply"
-        return 1
     else
         warn "部分 patches 未应用，建议执行: $0 apply"
-        return 1
     fi
 }
 
-# ── 主命令分发 ───────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# 主命令分发
+# ═══════════════════════════════════════════════════════════════════════════
 
 CMD="${1:-check}"
 
@@ -412,7 +412,7 @@ case "$CMD" in
         echo "  应用 Hermes Patches"
         echo "═══════════════════════════════════════════════════"
         echo ""
-        apply_hermes_agent
+        apply_all
         echo ""
         ok "应用完成！重启 Hermes / 刷新 WebUI 生效"
         echo ""
