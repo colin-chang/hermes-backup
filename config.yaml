@@ -53,7 +53,7 @@ custom_providers:
         context_length: 204800
       deepseek/deepseek-v4-pro: # 0.435
         context_length: 1000000
-      volcengine/doubao-seed-2.0-pro: # 0.45 Multimodal
+      bytedance/doubao-seed-2.0-pro: # 0.45 Multimodal
         context_length: 256000
       z-ai/glm-5.1: # 0.88
         context_length: 200000
@@ -169,6 +169,10 @@ mcp_servers:
       - -y
       - bb-browser
       - --mcp
+  qmd:
+    command: qmd
+    args:
+      - mcp
 
 # ── 平台工具集 ───────────────────────────────────────────────────────
 platform_toolsets:

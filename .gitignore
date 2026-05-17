@@ -5,21 +5,22 @@
 #       不追踪：运行时状态、缓存、二进制、敏感凭证、可从代码恢复的文件。
 # =============================================================================
 
-# ── 代码本体（自带 Git 仓库，hermes update 管理） ─────────────────────────
+# ── 代码本体（自带 Git 仓库，hermes update 管理） ─────────────────────────────
 hermes-agent/
 hermes-webui/
 plugins/
 
-# ── 敏感凭证（绝不能进版本控制） ──────────────────────────────────────────
+# ── 敏感凭证（绝不能进版本控制） ──────────────────────────────────────────────
 .env
 auth.json
 
-# ── 锁文件 / PID（运行时进程状态） ────────────────────────────────────────
+# ── 锁文件 / PID（运行时进程状态） ────────────────────────────────────────────
 *.lock
 *.pid
 .clean_shutdown
+Processes.json
 
-# ── SQLite 数据库（二进制 + WAL，频繁变动） ───────────────────────────────
+# ── SQLite 数据库（二进制 + WAL，频繁变动） ───────────────────────────────────
 state.db
 state.db-shm
 state.db-wal
@@ -27,21 +28,18 @@ kanban.db
 kanban.db-shm
 kanban.db-wal
 
-# ── 会话数据（频繁写入，体积大，非配置） ─────────────────────────────────
+# ── 会话数据（频繁写入，体积大，非配置） ─────────────────────────────────────
 sessions/
-webui/sessions/
-webui/_turn_journal/
 
-# ── 日志 ─────────────────────────────────────────────────────────────────
+# ── 日志 ─────────────────────────────────────────────────────────────────────
 logs/
 
-# ── 运行时状态 ──────────────────────────────────────────────────────────
-webui.ctl.env
+# ── 运行时状态 ──────────────────────────────────────────────────────────────
 cron/output/
 .update_check
 state-snapshots/
 
-# ── 缓存 ────────────────────────────────────────────────────────────────
+# ── 缓存 ────────────────────────────────────────────────────────────────────
 cache/
 audio_cache/
 image_cache/
@@ -49,31 +47,120 @@ sandboxes/
 *cache.json
 *snapshot.json
 
-# ── Gateway 运行时状态 ───────────────────────────────────────────────────
+# ── Gateway 运行时状态 ───────────────────────────────────────────────────────
 gateway_state.json
 channel_directory.json
 discord_threads.json
 gateway/
 gateway.*
 
-# ── 二进制 ──────────────────────────────────────────────────────────────
-bin/
-
-# ── Skills（全部从 hermes-agent 内置代码复制而来，可随时恢复） ─────────────
-# 如果未来你创建了自建 skill，想单独追踪，用 git add -f 强制添加
-skills/
-
-# ── WebUI 运行时数据 ─────────────────────────────────────────────────────
+# ── WebUI（运行时数据 + 会话 + 控制文件） ─────────────────────────────────────
 webui/
 webui.*
 
-# ── 浏览器调试 ──────────────────────────────────────────────────────────
+# ── 二进制 ──────────────────────────────────────────────────────────────────
+bin/
+
+# =============================================================================
+# Skills ─ 精细化追踪策略
+# =============================================================================
+# 系统内置 Skill（.bundled_manifest 清单内）→ 不追踪，hermes update 可随时恢复
+# 第三方可重装 Skill（bb-browser / dokobot）  → 不追踪，npm install -g 即可恢复
+# 用户自建 Skill                              → 自动纳入 Git 管理，无需额外操作
+# 维护：hermes update 后若 git status 出现漏网之鱼，补加路径即可
+# =============================================================================
+
+# ── Skills 元数据 ────────────────────────────────────────────────────────────
+skills/.hub/
+skills/.bundled_manifest
+skills/.usage.json
+skills/.usage.json.lock
+skills/.curator_state
+
+# ── 纯内置目录（整目录忽略） ──────────────────────────────────────────────────
+skills/apple/
+skills/autonomous-ai-agents/
+skills/data-science/
+skills/dogfood/
+skills/email/
+skills/gaming/
+skills/github/
+skills/mcp/
+skills/media/
+skills/mlops/
+skills/note-taking/
+skills/red-teaming/
+skills/research/
+skills/smart-home/
+skills/social-media/
+skills/software-development/
+skills/yuanbao/
+
+# ── 空分类目录（仅含 DESCRIPTION.md，无 Skill 文件） ──────────────────────────
+skills/diagramming/
+skills/domain/
+skills/gifs/
+skills/inference-sh/
+
+# ── 第三方可重装 Skill ────────────────────────────────────────────────────────
+skills/bb-browser/         # npm install -g bb-browser → 恢复
+skills/doko*               # npm install -g @dokobot/cli → 恢复
+
+# ── 混合目录：忽略内置 Skill，保留用户自建的 ─────────────────────────────────
+# creative/ → 除 zenmux-video 外均为内置
+skills/creative/DESCRIPTION.md
+skills/creative/architecture-diagram/
+skills/creative/ascii-art/
+skills/creative/ascii-video/
+skills/creative/baoyu-comic/
+skills/creative/baoyu-infographic/
+skills/creative/claude-design/
+skills/creative/comfyui/
+skills/creative/creative-ideation/
+skills/creative/design-md/
+skills/creative/excalidraw/
+skills/creative/humanizer/
+skills/creative/manim-video/
+skills/creative/p5js/
+skills/creative/pixel-art/
+skills/creative/popular-web-designs/
+skills/creative/pretext/
+skills/creative/sketch/
+skills/creative/songwriting-and-ai-music/
+skills/creative/touchdesigner-mcp/
+
+# devops/ → 除 hermes-weekly-cleanup 外均为内置
+skills/devops/kanban-orchestrator/
+skills/devops/kanban-worker/
+skills/devops/webhook-subscriptions/
+
+# productivity/ → 除 browser-control 和 tool-selection-strategy 外均为内置
+skills/productivity/DESCRIPTION.md
+skills/productivity/airtable/
+skills/productivity/google-workspace/
+skills/productivity/linear/
+skills/productivity/maps/
+skills/productivity/nano-pdf/
+skills/productivity/notion/
+skills/productivity/ocr-and-documents/
+skills/productivity/powerpoint/
+skills/productivity/teams-meeting-pipeline/
+
+# ── 用户自建 Skill（自动追踪，以下为当前已创建的清单参考） ────────────────────
+# skills/browser/chrome-profile-sync/
+# skills/creative/zenmux-video/
+# skills/devops/hermes-weekly-cleanup/
+# skills/productivity/browser-control/
+# skills/productivity/tool-selection-strategy/
+# skills/roles/
+
+# ── 浏览器调试 ──────────────────────────────────────────────────────────────
 chrome-debug/
 
-# ── 生成的媒体文件 ──────────────────────────────────────────────────────
+# ── 生成的媒体文件 ──────────────────────────────────────────────────────────
 images/
 
-# ── 备份 / 历史 / 第三方工具配置 ─────────────────────────────────────────
+# ── 备份 / 历史 / 第三方工具配置 ─────────────────────────────────────────────
 lsp/
 backups/
 .hermes_history

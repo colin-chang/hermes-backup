@@ -3,7 +3,7 @@
   "onboarding_completed": true,
   "send_key": "enter",
   "show_token_usage": true,
-  "show_quota_chip": false,
+  "show_quota_chip": true,
   "show_tps": false,
   "fade_text_effect": true,
   "show_cli_sessions": false,
@@ -26,5 +26,5 @@
   "sidebar_density": "compact",
   "auto_title_refresh_every": "10",
   "busy_input_mode": "queue",
-  "password_hash": null
+  "password_hash": "52b782f944cae328eb13d817c2fac28baa45fbc3d634bf0d4223e694bee25307"
 }
