@@ -3,12 +3,54 @@
 # 仅保留自定义配置，运行时自动与内置默认值合并
 # ═══════════════════════════════════════════════════════════════════════
 
-# ── 核心模型 ──────────────────────────────────────────────────────────
+# 主力模型商
+custom_providers:
+  - name: zenmux
+    base_url: https://zenmux.ai/api/v1
+    api_key: ${ZENMUX_API_KEY}
+    models:
+      google/gemini-3.1-flash-lite:       # $0.25  Multimodal
+        context_length: 1050000
+      minimax/minimax-m2.7:               # $0.30
+        context_length: 204800
+      deepseek/deepseek-v4-pro:           # $0.44
+        context_length: 1000000
+      bytedance/doubao-seed-2.0-pro:      # $0.45  Multimodal
+        context_length: 256000
+      z-ai/glm-5.1:                       # $0.88
+        context_length: 200000
+      moonshotai/kimi-k2.6:               # $0.95  Multimodal
+        context_length: 262140
+      qwen/qwen3.6-max-preview:           # $1.30
+        context_length: 262140
+      openai/gpt-5.3-codex:               # $1.75  Multimodal
+        context_length: 400000
+      google/gemini-3.1-pro-preview:      # $2.00  Multimodal
+        context_length: 1050000
+      anthropic/claude-sonnet-4.6:        # $3.00  Multimodal
+        context_length: 1000000
+      anthropic/claude-opus-4.7:          # $5.00  Multimodal
+        context_length: 1000000
+      openai/gpt-5.5:                     # $5.00  Multimodal
+        context_length: 1050000
+      openai/gpt-5.5-pro:                 # $30.0  Multimodal
+        context_length: 400000
+
+# 备用模型商（主提供商不可用时按顺序故障转移）
+fallback_providers:
+  - provider: custom
+    model: qwen3.5
+    base_url: http://localhost:11434/v1
+    api_key: ollama
+
+# ── 模型层 ──────────────────────────────────────────────────────────
+
+# 主力模型
 model:
   provider: custom:zenmux
   default: deepseek/deepseek-v4-pro
 
-# ── 辅助模型（均走 ZenMux）──────────────────────────────────────────
+# 辅助模型（均走 ZenMux）
 auxiliary:
   vision:
     provider: custom:zenmux
@@ -41,127 +83,49 @@ auxiliary:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
 
-# ── 自定义主力模型商（Zenmux）──────────────────────────────────────────────
-custom_providers:
-  - name: zenmux
-    base_url: https://zenmux.ai/api/v1
-    api_key: ${ZENMUX_API_KEY}
-    models:
-      google/gemini-3.1-flash-lite: # 0.25 Multimodal
-        context_length: 1050000
-      minimax/minimax-m2.7: #0.3
-        context_length: 204800
-      deepseek/deepseek-v4-pro: # 0.435
-        context_length: 1000000
-      bytedance/doubao-seed-2.0-pro: # 0.45 Multimodal
-        context_length: 256000
-      z-ai/glm-5.1: # 0.88
-        context_length: 200000
-      moonshotai/kimi-k2.6: # 0.95 Multimodal
-        context_length: 262140
-      qwen/qwen3.6-max-preview: # 1.3
-        context_length: 262140
-      openai/gpt-5.3-codex: # 1.75 Multimodal
-        context_length: 400000
-      google/gemini-3.1-pro-preview: # 2 Multimodal
-        context_length: 1050000
-      anthropic/claude-sonnet-4.6: # 3 Multimodal
-        context_length: 1000000
-      anthropic/claude-opus-4.7: # 5 Multimodal
-        context_length: 1000000
-      openai/gpt-5.5: # 5 Multimodal
-        context_length: 1050000
-      openai/gpt-5.5-pro: # 30 Multimodal
-        context_length: 400000
 
-# ── 备用模型商（Fallback）──────────────────────────────────────────────
-# 主提供商不可用时自动故障转移，按顺序尝试，429/529/503/连接失败时触发
-fallback_providers:
-           # 本地 Ollama 服务的共用锚点
-  - &ollama
-    provider: ollama
-    model: qwen3.5
-    base_url: http://localhost:11434/v1
-    api_key: ollama
-  - <<: *ollama
-    model: qwen2.5-coder
 
-# ── 智能体行为 ───────────────────────────────────────────────────────
+# ── 行为层 ──────────────────────────────────────────────────────────
+
+# 智能体
 agent:
   max_turns: 180  # 默认 90
 
+# 终端
 terminal:
   timeout: 600  # 默认 180
 
+# 网络搜索
 web:
   backend: brave-free  # 默认空
 
+# 审批与权限
 approvals:
-  mode: smart  # 默认 manual，智能审批低风险命令
-
+  mode: smart                    # 默认 manual，智能审批低风险命令
+  cron_mode: approve             # 定时任务自动批准
   destructive_slash_confirm: false
+
+# 定时任务
 cron:
-  wrap_response: false  # 默认 true
+  wrap_response: false
 
+# 会话管理
 sessions:
-  auto_prune: true  # 默认 false
+  auto_prune: true
 
-updates:
-  pre_update_backup: true  # 默认 false
+# ── 集成层 ──────────────────────────────────────────────────────────
 
-# ── Discord（唯一已配置的平台）──────────────────────────────────────
-discord:
-  auto_thread: false  # 默认 true
-  thread_require_mention: true  # 默认 false
-  gateway_restart_notification: false  # 非默认字段，抑制重启通知
+# Mattermost
+mattermost:
+  require_mention: false
+  gateway_restart_notification: false
+  channel_prompts:
+    5amtupypk7rd7gifc1ea64z77r: 以自媒体运营身份工作
+    ou1s9d7x8t87xnymw99inkniow: 切换投资顾问模式
+    t9qbg1apejywbj1kayohw5hiwc: 切换为加拿大事务模式
+    enuhz6t5t7g1dr5bm6q5hh7aky: 以育儿专家身份回答
 
-# ── 显示与交互 ───────────────────────────────────────────────────────
-display:
-  language: zh  # 默认 en
-  streaming: true  # 默认 false
-  bell_on_complete: true  # 默认 false
-  show_cost: true  # 默认 false
-  background_process_notifications: all  # 默认未设置
-  tool_progress: all  # 默认未设置
-
-privacy:
-  redact_pii: true  # 默认 false
-
-# ── 媒体生成 ─────────────────────────────────────────────────────────
-image_gen:
-  provider: zenmux
-  zenmux:
-    model: openai/gpt-image-2
-
-video_gen:
-  provider: zenmux-video
-  model: google/veo-3.1-fast-generate-001
-
-# ── 流式输出 ─────────────────────────────────────────────────────────
-streaming:
-  enabled: true
-  transport: edit
-  edit_interval: 0.3
-  buffer_threshold: 40
-  fresh_final_after_seconds: 60
-
-# ── 插件 ─────────────────────────────────────────────────────────────
-plugins:
-  enabled:
-    - zenmux-image
-    - zenmux-video
-
-# ── 技能管理 ─────────────────────────────────────────────────────────
-curator:
-  backup:
-    keep: 3  # 默认 5
-
-onboarding:
-  seen:
-    openclaw_residue_cleanup: true
-    tool_progress_prompt: true
-
-# ── MCP 服务器 ───────────────────────────────────────────────────────
+# MCP 服务器
 mcp_servers:
   bb-browser:
     command: npx
@@ -174,7 +138,66 @@ mcp_servers:
     args:
       - mcp
 
-# ── 平台工具集 ───────────────────────────────────────────────────────
+# 插件
+plugins:
+  enabled:
+    - zenmux-image
+    - zenmux-video
+
+# ── 输出层 ──────────────────────────────────────────────────────────
+
+# 显示与交互
+display:
+  language: zh
+  streaming: true
+  bell_on_complete: true
+  show_cost: true
+  background_process_notifications: all
+  platforms:
+    mattermost:
+      streaming: true
+      # tool_progress: off
+
+# 流式输出
+streaming:
+  enabled: true
+  transport: edit
+  edit_interval: 0.3
+  buffer_threshold: 40
+  fresh_final_after_seconds: 1200
+
+# 隐私
+privacy:
+  redact_pii: true
+
+# 媒体生成
+image_gen:
+  provider: zenmux
+  zenmux:
+    model: openai/gpt-image-2
+video_gen:
+  provider: zenmux-video
+  model: google/veo-3.1-fast-generate-001
+
+# ── 管理层 ──────────────────────────────────────────────────────────
+
+# 技能管理
+curator:
+  backup:
+    keep: 3
+
+# 引导状态（已完成的 onboarding 提示）
+onboarding:
+  seen:
+    openclaw_residue_cleanup: true
+    tool_progress_prompt: true
+    busy_input_prompt: true
+
+# 更新与维护
+updates:
+  pre_update_backup: true
+
+# 平台工具集
 platform_toolsets:
   cli:
     - browser
@@ -194,7 +217,7 @@ platform_toolsets:
     - tts
     - vision
     - web
-  discord:
+  mattermost:
     - browser
     - clarify
     - code_execution
@@ -231,5 +254,11 @@ platform_toolsets:
   google_chat:
     - hermes-google_chat
 
-# ── 时区 ─────────────────────────────────────────────────────────────
+# ── 终端 ────────────────────────────────────────────────────────────
+
+terminal:
+  cwd: ~/.hermes/workspace
+
+# ── 全局 ────────────────────────────────────────────────────────────
+
 timezone: Asia/Shanghai

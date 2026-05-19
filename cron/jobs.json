@@ -20,26 +20,26 @@
       "schedule_display": "0 2 * * *",
       "repeat": {
         "times": null,
-        "completed": 7
+        "completed": 8
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:26:59.754948+08:00",
-      "next_run_at": "2026-05-19T02:00:00+08:00",
-      "last_run_at": "2026-05-18T02:00:40.374575+08:00",
+      "next_run_at": "2026-05-20T02:00:00+08:00",
+      "last_run_at": "2026-05-19T02:00:51.636596+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "discord",
+      "deliver": "mattermost:xsdt56rfjt8x3c9nzzjou3wayo",
       "origin": null,
       "enabled_toolsets": null,
       "workdir": null
     },
     {
       "id": "2e081401e374",
-      "name": "移民圈子动态日报",
+      "name": "加拿大移民日报",
       "prompt": "读取 /Users/Colin/.hermes/scripts/immigration-monitor-prompt.md，严格按其中的四阶段流程（抓取→过滤→分析→输出）执行今日加拿大移民动态日报任务。你的最终 assistant 消息必须就是报告本体（以「📋 加拿大移民动态日报」开头），不要输出任何中间抓取过程、URL 或工具调用结果——这些仅供你内部分析使用。Cron 会将报告直接投递到 Discord 任务通知频道。",
       "skills": [
         "role-canada-affairs",
@@ -63,19 +63,19 @@
       "schedule_display": "0 17 * * *",
       "repeat": {
         "times": null,
-        "completed": 5
+        "completed": 9
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:30:30.666366+08:00",
-      "next_run_at": "2026-05-18T17:00:00+08:00",
-      "last_run_at": "2026-05-17T20:26:10.604894+08:00",
+      "next_run_at": "2026-05-20T17:00:00+08:00",
+      "last_run_at": "2026-05-19T17:06:29.151193+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "discord",
+      "deliver": "mattermost:xsdt56rfjt8x3c9nzzjou3wayo",
       "origin": null,
       "enabled_toolsets": [
         "terminal",
@@ -107,7 +107,7 @@
       "schedule_display": "0 3 * * 0",
       "repeat": {
         "times": null,
-        "completed": 1
+        "completed": 3
       },
       "enabled": true,
       "state": "scheduled",
@@ -115,11 +115,11 @@
       "paused_reason": null,
       "created_at": "2026-05-17T01:04:16.155230+08:00",
       "next_run_at": "2026-05-24T03:00:00+08:00",
-      "last_run_at": "2026-05-17T03:00:56.872460+08:00",
+      "last_run_at": "2026-05-18T23:17:53.016997+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
-      "deliver": "discord",
+      "deliver": "mattermost:xsdt56rfjt8x3c9nzzjou3wayo",
       "origin": null,
       "enabled_toolsets": null,
       "workdir": null,
@@ -127,5 +127,5 @@
       "toast_notifications": true
     }
   ],
-  "updated_at": "2026-05-18T02:00:40.375459+08:00"
+  "updated_at": "2026-05-19T17:06:29.151873+08:00"
 }

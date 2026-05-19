@@ -15,9 +15,27 @@ metadata:
 
 ---
 
+## ⚠️ Agent 行为 vs 引擎机制（关键概念）
+
+本 Skill 描述的「降级链」是 **Agent（LLM）层行为指令**，不是 Hermes 引擎的自动 fallback：
+
+| 层 | 机制 | 说明 |
+|----|------|------|
+| **引擎层** | Provider 选择 + 错误透传 | `web_search` 调用的后端（如 brave-free）由 config 决定。若 provider 调用失败（HTTP 429/5xx），错误以 `{success: false, error: "..."}` JSON 原样返回给 LLM——**引擎不做 provider 切换或重试** |
+| **Agent 层** | tool result 解析 + 降级执行 | LLM 收到 `success: false` 后，**主动**调用 `terminal("dokobot search ...")` 完成降级。这是本 Skill 指导 LLM 执行的行为 |
+
+这意味着：
+- `web_search` 返回错误时，LLM 必须自己识别失败并手动执行降级——不会自动发生
+- 如果 LLM 没有加载本 Skill 或忽略了 tool result 中的 `success: false`，降级就不会执行
+- Brave 免费层配额：2,000 次/月、1 QPS，超限返回 HTTP 429
+
+---
+
 ## 路径一：信息获取（只读）
 
 **优先级链：Web Search → Dokobot**
+
+> 此链是 Agent 层指令——LLM 需主动检测失败并手动降级。
 
 | 优先级 | 工具 | 适用场景 |
 |--------|------|----------|
@@ -97,11 +115,17 @@ BB Browser 的 Site 系统提供 36+ 平台的 CLI 化命令，比 Hermes 原生
     └── Site 无 adapter？→ BB Browser MCP 工具 或 Hermes 原生 browser 工具
 ```
 
+> **参考文档**：`references/hermes-web-search-architecture.md` — Hermes Web Search 引擎层调用链路、Provider 选择逻辑、Brave Free 配额限制、引擎层 vs Agent 层职责边界。
+
 ---
 
-## ⚠️ 常见错误
+## ⚠️ 常见错误（每次工具选择前必须自查）
 
 1. **用 `web_extract` 抓 SPA 页面** → 只拿到空壳 HTML，应该降级到 `dokobot read`
 2. **用 Dokobot 填写表单** → Dokobot 是只读的，应该用 BB Browser
 3. **Web Search 失败后直接放弃** → 必须降级到 Dokobot，不要跳过
 4. **BB Browser 做简单信息获取** → 杀鸡用牛刀，简单获取用 web_search 即可
+5. **误以为引擎会自动降级** → `web_search` 的 Brave 超限/报错只是返回 `success: false` JSON，引擎不做 provider 切换或 dokobot 自动调用。降级是 LLM Agent 的主动行为，不是自动机制。
+6. **🚫 web_search/web_extract 失败后直接调浏览器工具（`browser_navigate` / `browser_cdp` 等）** → **这是最严重的违规**。信息获取路径和浏览器自动化路径是两条独立闭环，永不相交。失败后只能降级 `dokobot read --local` → `dokobot read`（远程），绝不能跨越到浏览器工具。
+
+> **注意**：SOUL.md 的「工具选择原则」章节已强化为强制执行规范，优先级高于本 Skill。两者冲突时以 SOUL.md 为准。

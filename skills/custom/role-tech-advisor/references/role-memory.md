@@ -20,7 +20,11 @@
 - Chrome CDP：bb-browser daemon 模式，9222端口
 
 ## 技术决策记录
-<!-- Agent: 在此记录重要的技术决策 -->
+
+### Hermes IM 平台选型（2026-05-18）
+- Discord 渲染碎片化（3 根因）→ 短期配置修复 + 源码修复
+- 长远方向：Fork hermes-webui 添加 Discord 风格层级（Server/Category/Channel/Thread）+ PostgreSQL 持久化
+- 完整对比矩阵：`references/hermes-platform-comparison.md`
 
 ## 常用凭证与工具约定
 
@@ -45,5 +49,25 @@
 - 不要手动启动 Chrome `--remote-debugging-port=9222` 模式
 - `chrome://inspect` 不是开启 CDP 服务，只是客户端发现界面
 
+## 消息平台替代评估
+
+### Discord → Mattermost 迁移评估
+- 时间：2026-05-18
+- 原因：Discord Markdown 渲染差 + Hermes 消息碎片化（2000字符溢出分片）
+- 候选方案对比详见：`hermes-agent` skill → `references/im-platform-comparison.md`
+- **Mattermost 为当前最接近理想的选择**：GFM 完整 Markdown（表格+标题+LaTeX）、16384字符上限（根治溢出）、全平台原生客户端（含 iPad）、Docker 自托管
+- 待决策：是否启动 Mattermost 本地部署验证
+
+### Telegram MarkdownV2 局限性
+- 不支持：表格、标题 H1-H6、有序/无序列表、LaTeX、HTML 标签
+- 不适合作为 AI Agent 长内容输出平台
+
 ## 配置细节
 <!-- Agent: 在此记录值得保留的配置经验 -->
+
+### iMessage 发送（2026-05-19）
+- 始终加载 `imessage-nomad`（非 builtin `imessage`，后者 bridge 路径已失效）
+- 加载方式：`/skill imessage-nomad` 或自然语言触发
+- Bridge 脚本在 skill 内：`~/.hermes/skills/custom/imessage-nomad/references/imsg-bridge.command`
+- 发送前自动检测 bridge 运行状态（`tmux has-session`），未运行则 `open` + `sleep 2`
+- 禁止使用 `osascript send`（假阳性根因：永远返回 exit 0，已导致 4 次重复发送事故）

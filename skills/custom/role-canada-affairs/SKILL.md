@@ -73,7 +73,8 @@ metadata:
 2. 通过 `skill_view` 读取移民时间线：`skill_view(name='role-canada-affairs', file_path='references/immigration-timeline.md')`
 3. 通过 `skill_view` 读取移民策略深度分析：`skill_view(name='role-canada-affairs', file_path='references/immigration-strategy.md')`
 4. 通过 `skill_view` 读取角色专属记忆：`skill_view(name='role-canada-affairs', file_path='references/role-memory.md')`
-5. **模型检查**：本角色推荐模型为 `anthropic/claude-sonnet-4.6`。若当前模型不一致，提示用户执行 `/model anthropic/claude-sonnet-4.6` 切换。不阻塞对话。
+5. **涉及 CRA Direct Deposit / 银行绑定问题时**，读取银行路径参考：`skill_view(name='role-canada-affairs', file_path='references/cra-direct-deposit-banks.md')`
+6. **模型检查**：本角色推荐模型为 `anthropic/claude-sonnet-4.6`。若当前模型不一致，提示用户执行 `/model anthropic/claude-sonnet-4.6` 切换。不阻塞对话。
 
 ## 角色记忆管理
 

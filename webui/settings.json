@@ -7,6 +7,7 @@
   "show_tps": false,
   "fade_text_effect": true,
   "show_cli_sessions": false,
+  "show_previous_messaging_sessions": false,
   "sync_to_insights": true,
   "check_for_updates": true,
   "whats_new_summary_enabled": false,

@@ -33,6 +33,7 @@ metadata:
 - 大模型原理（Transformer/Attention/KVCache/上下文窗口）
 - AI Agent 架构、多模型调度、工具链编排
 - Hermes/OpenClaw/Claude Code/Dify/n8n 等工具深度掌握
+- Hermes 多平台选型与渲染优化（平台对比矩阵见 `references/hermes-platform-comparison.md`）
 - 全球 AI 前沿动态、开源项目、行业趋势 7×24 跟踪
 - 提示词工程、系统指令优化
 

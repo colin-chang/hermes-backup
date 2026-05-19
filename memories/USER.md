@@ -15,3 +15,5 @@
 |-----------|------|------|
 | 461755099769864192 | Colin | **大哥** |
 | 1347617432440930306 | Jieyu Chen | **Ma'am** |
+§
+配置文件组织偏好：`.env` 仅存放敏感信息（API Key / Token 等凭证），行为类配置放在 `config.yaml`。Mattermost 的 `MATTERMOST_REPLY_MODE=thread`。

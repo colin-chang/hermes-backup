@@ -1,0 +1,249 @@
+---
+name: imessage-nomad
+description: "通过 imsg Bridge Daemon（JSON-RPC over TCP）发送 iMessage/SMS。解决 macOS Full Disk Access 限制，提供可靠的送达确认。"
+version: 3.2.1
+author: Community
+license: MIT
+platforms: [macos]
+tags: [iMessage, SMS, messaging, macOS, Apple, bridge, FDA]
+prerequisites:
+  commands: [tmux, socat, python3, imsg]
+---
+
+# iMessage Bridge — 通过 TCP 桥接发送 iMessage
+
+> ⚠️ 本 skill 中的路径 `<SKILL_DIR>` 代表 skill 的安装目录。请替换为实际路径（如 Hermes 中为 `~/.hermes/skills/custom/imessage-nomad`）。
+
+通过 **imsg Bridge Daemon**（socat + JSON-RPC）发送 iMessage/SMS，具备可靠的送达确认（数据库级 `guid` 验证）。
+
+## 为什么需要这个
+
+macOS 的"完全磁盘访问"（FDA）仅接受 `.app` bundle，AI Agent（Python/Node 进程）无法被授予 FDA。但 Terminal.app 可拥有 FDA，其子进程自动继承。
+
+**本方案**：从 Terminal.app 启动 TCP 桥接守护进程，Agent 通过 Python socket 发 JSON-RPC → `localhost:8899`，桥接进程继承 FDA，可完整读写 `chat.db`。
+
+参考：OpenClaw #5116 — FDA 通过终端进程链继承的原理验证。
+
+## 架构
+
+```
+Agent (无 FDA)
+    │  Python socket 127.0.0.1:8899  ← JSON-RPC
+    ▼
+socat TCP-LISTEN:8899 (tmux 后台)
+    │  fork + exec
+    ▼
+imsg rpc (FDA ✅ 继承自 Terminal.app)
+    ├─ ~/Library/Messages/chat.db
+    └─ AppleScript → Messages.app 发送
+```
+
+## 前置条件（一次性）
+
+1. `brew install socat`
+2. `brew install steipete/tap/imsg`
+3. Terminal.app（`/System/Applications/Utilities/Terminal.app`）在 **系统设置 → 隐私与安全性 → 完全磁盘访问权限** 中已授权
+4. Messages.app 已登录 iMessage
+
+## Bridge 脚本
+
+脚本位置：`references/imsg-bridge.command`（随本 skill 一起分发）
+
+首次使用前：
+
+```bash
+chmod +x <SKILL_DIR>/references/imsg-bridge.command
+```
+
+## 每次发送前 — 自动检测与启动
+
+**bridge 是否运行由发送流程自动检测，无需手动管理或设置开机自启：**
+
+```bash
+# 检测 bridge 是否运行；未运行则自动启动
+tmux has-session -t imsg-bridge 2>/dev/null || {
+    open <SKILL_DIR>/references/imsg-bridge.command
+    sleep 2
+}
+```
+
+> `sleep 2` 是必须的——`open` 异步执行，bridge 完成端口绑定需要 1-2 秒。
+
+**标准发送流程（检测 + 发送合并，但分两步 terminal 调用）：**
+
+```bash
+# Step 1: 确保 bridge 在运行（幂等）
+tmux has-session -t imsg-bridge 2>/dev/null || {
+    open <SKILL_DIR>/references/imsg-bridge.command
+    sleep 2
+}
+
+# Step 2: 用 Python socket 发送（必须接收响应）
+python3 -c "
+import socket, json, time
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 8899))
+s.settimeout(10)
+payload = json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'recipient@example.com','text':'Hello'}}) + '\n'
+s.sendall(payload.encode())
+time.sleep(1)
+try:
+    print(s.recv(4096).decode())
+except socket.timeout:
+    print('TIMEOUT')
+s.close()
+"
+```
+
+## 发送方法
+
+> ⚠️ **macOS `nc` 的坑**：`echo '...' | nc` 在发完数据后立即关闭连接，`imsg rpc` 的 JSON-RPC 响应会被丢弃（消息实际已发）。**必须用 Python socket 接收响应，严禁用 `nc` 管道直发而不收响应。**
+
+### 短消息发送（标准方法）
+
+```bash
+python3 -c "
+import socket, json
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 8899))
+s.settimeout(10)
+payload = json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'recipient@example.com','text':'消息内容'}}) + '\n'
+s.sendall(payload.encode())
+import time; time.sleep(1)
+try:
+    print(s.recv(4096).decode())
+except socket.timeout:
+    print('TIMEOUT')
+s.close()
+"
+```
+
+### 长文本发送（避免 shell 转义）
+
+当消息内容包含换行、引号、特殊字符时：
+
+```bash
+cat > /tmp/imessage-content.txt << 'EOF'
+<任意内容，支持 Markdown、emoji、换行等>
+EOF
+
+python3 -c "
+import socket, json, time
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 8899))
+s.settimeout(10)
+with open('/tmp/imessage-content.txt') as f:
+    text = f.read()
+payload = json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'recipient@example.com','text':text}}) + '\n'
+s.sendall(payload.encode())
+time.sleep(1)
+try:
+    print(s.recv(4096).decode())
+except socket.timeout:
+    print('TIMEOUT')
+s.close()
+"
+```
+
+## 成功/失败判断
+
+`imsg rpc` 返回结构化 JSON，**区别于 AppleScript 的假阳性**（`osascript send` 永远返回 exit 0）：
+
+```
+✅ 成功 — 消息已确认写入 chat.db
+   {"jsonrpc":"2.0","id":"1","result":{"ok":true,"transport":"applescript","id":1979,"guid":"8DF..."}}
+   → 有 "guid" 字段 = 数据库已确认。停止，不重试。
+
+⚠️ 提交但未确认
+   {"jsonrpc":"2.0","id":"1","result":{"ok":true}}
+   → 无 "guid" 字段。消息已提交但未在数据库中观测到。不重试。
+
+⚠️ 空响应（macOS nc 经典陷阱）
+   空输出 + exit 0 或 TIMEOUT
+   → nc 在收到响应前断开了连接，但消息**通常已经发出去了**。严禁重试！
+
+❌ 失败
+   {"jsonrpc":"2.0","id":"1","error":{"code":-32000,"message":"..."}}
+   → 或连接拒绝。不重试。
+
+🚫 绝对禁止：
+   - 用 `echo '...' | nc` 一发就跑（响应被丢弃，100% 触发空响应→误判→重试循环）
+   - 因空响应/无 guid 而重试 → 重试 = 重复发送
+```
+
+## 可用 JSON-RPC 方法
+
+| 方法 | 用途 | FDA |
+|------|------|-----|
+| `send` | 发送文本/文件 | ✅ |
+| `chats.list` | 列出最近对话 | ✅ |
+| `messages.history` | 查聊天历史 | ✅ |
+| `watch.subscribe` | 实时监听新消息 | ✅ |
+| `react` | Tapback 快捷回复 | ✅ |
+
+协议文档：https://imsg.sh/rpc.html
+
+## 配置收件人
+
+在 SKILL.md 或调用侧维护联系人列表。示例：
+
+| 姓名 | 标识符 | 类型 |
+|------|--------|------|
+| 张三 | `zhangsan@icloud.com` | 邮箱 |
+| 李四 | `+8613800138000` | 手机号 |
+
+> ⚠️ **优先用邮箱**：macOS 可能脱敏显示电话号码（如 `+138****1912`），脱敏号码会导致静默失败。
+
+## Bridge 管理
+
+### 启动
+
+```bash
+open <SKILL_DIR>/references/imsg-bridge.command
+```
+
+### 状态检查
+
+```bash
+pgrep -f "imsg rpc"                     # 查进程
+echo '{"jsonrpc":"2.0","id":"1","method":"chats.list","params":{"limit":1}}' | nc -w 3 127.0.0.1 8899  # 发测试
+tail -f /tmp/imsg-bridge.log            # 查看日志
+```
+
+### 停止
+
+```bash
+tmux kill-session -t imsg-bridge
+```
+
+## 故障排查
+
+| 症状 | 原因 | 解决 |
+|------|------|------|
+| `ConnectionRefusedError` | bridge 未启动 | `open <SKILL_DIR>/references/imsg-bridge.command` |
+| `permission denied (code: 23)` | 终端没有 FDA | 给 Terminal.app 加 FDA |
+| 返回 `ok` 无 `guid` | 已提交但 DB 未确认 | 不重试 |
+| 返回 `ok` 有 `guid` 但对方没收到 | Messages.app 未登录 | 确认 Messages.app 已登录 iMessage |
+| `socat: command not found` | socat 未装 | `brew install socat` |
+| 合并命令中 `&&` 跳过发送 | Shell `\|\| &&` 优先级错误 | 用 `{ }` 分组分两步调用 |
+
+> 完整调试指南（空响应 4 次重送事故、ConnectionRefusedError 排查、进程诊断）→ [`references/send-debugging-guide.md`](references/send-debugging-guide.md)
+
+## ⛔ 已弃用：AppleScript 直接调用
+
+`osascript send` 永远返回 exit 0，无法判断消息是否送达，自动化中使用会导致假阳性重复发送。禁止在任何自动化流程中使用。
+
+```bash
+# ⛔ 弃用 — 禁止在自动化中使用
+osascript -e 'tell application "Messages" to send "消息" to buddy "recipient@example.com"'
+```
+
+## Cron 任务集成
+
+Cron 任务需推送 iMessage 时，在 prompt 中嵌入 bridge 调用。
+
+详见：[`references/cron-imessage-delivery-pattern.md`](references/cron-imessage-delivery-pattern.md)
+
+## FDA 权限链与备选方案
+
+详见：[`references/imessage-fda-bridge.md`](references/imessage-fda-bridge.md)

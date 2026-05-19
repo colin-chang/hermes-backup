@@ -44,6 +44,7 @@ cache/
 audio_cache/
 image_cache/
 sandboxes/
+*cache.yaml
 *cache.json
 *snapshot.json
 
@@ -64,10 +65,9 @@ bin/
 # =============================================================================
 # Skills ─ 精细化追踪策略
 # =============================================================================
-# 系统内置 Skill（.bundled_manifest 清单内）→ 不追踪，hermes update 可随时恢复
-# 第三方可重装 Skill（bb-browser / dokobot）  → 不追踪，npm install -g 即可恢复
-# 用户自建 Skill                              → 自动纳入 Git 管理，无需额外操作
-# 维护：hermes update 后若 git status 出现漏网之鱼，补加路径即可
+# 系统内置 Skill（.bundled_manifest 清单内）→ 不追踪，hermes update 可恢复
+# 插件可重装 Skill（bb-browser / doko*）     → 不追踪，npm install -g 可恢复
+# 用户自建 Skill（skills/custom/ 整目录）    → 自动纳入 Git 管理
 # =============================================================================
 
 # ── Skills 元数据 ────────────────────────────────────────────────────────────
@@ -81,6 +81,8 @@ skills/.curator_state
 skills/apple/
 skills/autonomous-ai-agents/
 skills/data-science/
+# devops/ — 全部内置（hermes-weekly-cleanup 已迁 custom/）
+skills/devops/
 skills/dogfood/
 skills/email/
 skills/gaming/
@@ -89,6 +91,8 @@ skills/mcp/
 skills/media/
 skills/mlops/
 skills/note-taking/
+# productivity/ — 全部内置（tool-selection-strategy 已迁 custom/）
+skills/productivity/
 skills/red-teaming/
 skills/research/
 skills/smart-home/
@@ -96,18 +100,19 @@ skills/social-media/
 skills/software-development/
 skills/yuanbao/
 
-# ── 空分类目录（仅含 DESCRIPTION.md，无 Skill 文件） ──────────────────────────
+# ── 空/废弃分类目录 ──────────────────────────────────────────────────────────
 skills/diagramming/
 skills/domain/
 skills/gifs/
 skills/inference-sh/
 
 # ── 第三方可重装 Skill ────────────────────────────────────────────────────────
-skills/bb-browser/         # npm install -g bb-browser → 恢复
-skills/doko*               # npm install -g @dokobot/cli → 恢复
+# bb-browser — npm install -g bb-browser 可恢复
+skills/bb-browser/
+# doko* — npm install -g @dokobot/cli 可恢复
+skills/doko*
 
-# ── 混合目录：忽略内置 Skill，保留用户自建的 ─────────────────────────────────
-# creative/ → 除 zenmux-video 外均为内置
+# ── 混合目录：忽略内置，保留用户自建（zenmux-video） ──────────────────────────
 skills/creative/DESCRIPTION.md
 skills/creative/architecture-diagram/
 skills/creative/ascii-art/
@@ -129,30 +134,11 @@ skills/creative/sketch/
 skills/creative/songwriting-and-ai-music/
 skills/creative/touchdesigner-mcp/
 
-# devops/ → 除 hermes-weekly-cleanup 外均为内置
-skills/devops/kanban-orchestrator/
-skills/devops/kanban-worker/
-skills/devops/webhook-subscriptions/
-
-# productivity/ → 除 browser-control 和 tool-selection-strategy 外均为内置
-skills/productivity/DESCRIPTION.md
-skills/productivity/airtable/
-skills/productivity/google-workspace/
-skills/productivity/linear/
-skills/productivity/maps/
-skills/productivity/nano-pdf/
-skills/productivity/notion/
-skills/productivity/ocr-and-documents/
-skills/productivity/powerpoint/
-skills/productivity/teams-meeting-pipeline/
-
-# ── 用户自建 Skill（自动追踪，以下为当前已创建的清单参考） ────────────────────
-# skills/browser/chrome-profile-sync/
-# skills/creative/zenmux-video/
-# skills/devops/hermes-weekly-cleanup/
-# skills/productivity/browser-control/
-# skills/productivity/tool-selection-strategy/
-# skills/roles/
+# ── 用户自建 Skill 目录（全部追踪） ───────────────────────────────────────────
+# skills/custom/ 下的所有内容自动纳入 Git 管理
+# 当前清单：hermes-weekly-cleanup, imessage-nomad, role-canada-affairs,
+#   role-content-ops, role-investment-advisor, role-parenting-expert,
+#   role-tech-advisor, tool-selection-strategy
 
 # ── 浏览器调试 ──────────────────────────────────────────────────────────────
 chrome-debug/
@@ -166,3 +152,4 @@ backups/
 .hermes_history
 .claude/
 .vscode/
+test.env
