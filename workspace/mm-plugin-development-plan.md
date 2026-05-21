@@ -2,7 +2,7 @@
 
 > 关联文档：[hermes-patches-migration-plan.md](./hermes-patches-migration-plan.md) — 上游 PR 迁移总路线图
 >
-> 创建时间：2026-05-19 | 状态：开发中（send_typing 覆写已完成，1 patch 已从源码迁移至插件）
+> 创建时间：2026-05-19 | 状态：✅ 已完成（v2.0.0，mattermost.py 源码零修改）
 
 ## 1. 目标
 
@@ -190,13 +190,13 @@ Mattermost WebSocket post.root_id ("" → None)
 ~/.hermes/plugins/mattermost-enhancer/
 ├── plugin.yaml              # 插件元数据 (kind=platform, min_hermes_version=2.0.0)
 ├── __init__.py              # 入口：register_platform(name="mattermost", adapter_factory=...)
-├── adapter.py               # MattermostApprovalAdapter 类 (~420 行)
+├── adapter.py               # MattermostApprovalAdapter 类 (~1180 行, 31 个方法)
 ├── callback_server.py       # HTTP callback 服务器辅助函数
 ├── cards.py                 # Interactive Message 卡片渲染
 ├── models.py                # 模型列表管理 (13 个模型)
 ├── session.py               # Session 定位与操作
 └── references/
-    └── api-contracts.md     # [待写] Mattermost Slash Command / Interactive Message API 契约
+    └── api-contracts.md     # MM API 契约文档 Mattermost Slash Command / Interactive Message API 契约
 ```
 
 ## 5. 接口契约
@@ -282,20 +282,20 @@ Content-Type: application/json
 - [x] 确认 `plugins.enabled` 机制已理解（`config.yaml` 中已添加 `mattermost-enhancer`）
 - [x] 验证插件加载链：`discover_plugins()` → `platform_registry.register("mattermost")` → `_create_adapter()` 优先使用插件
 
-### 阶段二：DM 审批迁移（核心）⬜
+### 阶段二：DM 审批迁移 ✅
 
 > **风险说明**：需要修改源码（`gateway/run.py` 中 `send_exec_approval` 调用路径），
 > 确保审批请求路由到插件的 `send_exec_approval` 而非内置方法。
 
-- [ ] 将 patches 7a-7d 的代码迁移到 `adapter.py`（继承 `MattermostAdapter`）
-  - [ ] `_resolve_root_id()`
-  - [ ] `_start_callback_server()` / `_stop_callback_server()`
-  - [ ] `_handle_callback()` / choice_map
-  - [ ] `send_exec_approval()`
-  - [ ] `connect()` / `disconnect()` 生命周期
-- [ ] 在 `__init__.py` 注册 platform override
-- [ ] 重启 gateway，验证 DM 审批功能正常
-- [ ] 从 `hermes-patches.sh` 移除 patches 7a-7d
+- [x] 将 patches 7a-7d 的代码迁移到 `adapter.py`（继承 `MattermostAdapter`）
+  - [x] `_resolve_root_id()`
+  - [x] `_start_callback_server()` / `_stop_callback_server()`
+  - [x] `_handle_callback()` / choice_map
+  - [x] `send_exec_approval()`
+  - [x] `connect()` / `disconnect()` 生命周期
+- [x] 在 `__init__.py` 注册 platform override
+- [x] 重启 gateway，验证 DM 审批功能正常
+- [x] 从 `hermes-patches.sh` 移除 patches 7a-7d
 
 ### 阶段三：Slash 指令扩展 ✅
 
@@ -320,12 +320,13 @@ Content-Type: application/json
 - [x] 在 Mattermost System Console 配置 `/model` 和 `/new` 自定义 Slash 指令
 - [x] 端到端测试（Channel 顶层 + Thread 中均正常）
 
-### 阶段四：收尾 ⬜
+### 阶段四：收尾 ✅
 
-- [ ] 验证 `git pull` 升级后插件仍然生效
-- [ ] 编写 `references/api-contracts.md`
-- [ ] 更新 `hermes-patches-migration-plan.md` 状态
-- [ ] 全面测试通过后，从 `hermes-patches.sh` 移除 patches 7a-7d
+- [x] 验证 `git pull` 升级后插件仍然生效
+- [x] 编写 `references/api-contracts.md`
+- [x] 更新 `hermes-patches-migration-plan.md` 状态
+- [x] 全面测试通过后，从 `hermes-patches.sh` 移除 patches 7a-7d
+- [x] 补全插件缺失的 DM 审批方法（`send_exec_approval`, `_get_or_create_dm`, `_verify_signature`, `_stop_callback_server`, `connect`, `disconnect`）
 
 ## 8. 验证清单
 
@@ -427,6 +428,26 @@ Content-Type: application/json
 - ✅ 模型切换多次均生效（API 日志确认）
 - ✅ DM Deny 后按钮清空，无法重复点击
 - ✅ Select 下拉列表 placeholder 显示当前模型
+
+
+### 2026-05-22：阶段二 + 阶段四完成 ✅
+
+**完成事项：**
+- DM 审批完整迁移至插件（`send_exec_approval`, `_get_or_create_dm`, `_verify_signature`, `_stop_callback_server`, `connect`, `disconnect` 覆写）
+- `_resolve_root_id` + `send()` / `_send_local_file()` / `_send_url_as_file()` 覆写（替代 patch 6）
+- MEDIA 静默跳过合并到 `_send_local_file()` 覆写（替代 patch 10c）
+- `mattermost.py` 源码回滚至 a91a57fa5（1292→852 行，零 patch 残留）
+- `hermes-patches.sh` 移除 patches 6, 7, 10c（registry + apply blocks，-673 行）
+- 3 个 Bug 修复：resolve_gateway_approval 延迟 import、provider 格式缺 custom: 前缀、pending_model_notes 时序错误
+- references/api-contracts.md 编写完成
+- plugin.yaml 升级至 v2.0.0，README 全面改版
+- hermes-patches.sh 标签人性化，registry 残留清理
+
+**最终效果：**
+```
+mattermost.py: 1292 行 (4 patch 残留) → 852 行 (零修改)
+hermes-patches.sh: 16 patch → 12 patch
+```
 
 ### 2026-05-22：send_typing Thread 路由迁移至插件 ✅
 
