@@ -56,7 +56,7 @@ _patch_registry=(
     "hermes_cli/doctor.py|hermes doctor 误报：用了自定义 provider 就弹「模型不匹配」假警告|startswith.*\"custom:\""
     "hermes_cli/model_switch.py|模型白名单没生效：config 里设了 models 限制但切模型时全跑出来了|and not models_list"
     "hermes_cli/model_switch.py|同上：custom_providers 的 models 白名单也一样被无视了|if not grp\\[\"models\"\\]"
-    "gateway/config.py|Gateway 重启提醒关不掉：明明设了 false 重启时还是收到那条消息|\\"gateway_restart_notification\\" in platform_cfg"
+    "gateway/config.py|Gateway 重启提醒关不掉：明明设了 false 重启时还是收到那条消息|\"gateway_restart_notification\" in platform_cfg"
     "gateway/config.py|同上：另一个读取路径也没读到你的配置|extra.*gateway_restart_notification"
     "cron/jobs.py|定时任务中文变乱码：描述里的汉字全变成 \\uXXXX 转义符|ensure_ascii=False"
     "utils.py|config.yaml 中文变乱码：配置文件里的中文注释被保存成 \\uXXXX|allow_unicode=True"
