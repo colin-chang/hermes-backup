@@ -16,6 +16,7 @@
   "font_size": "default",
   "session_jump_buttons": true,
   "session_endless_scroll": true,
+  "hidden_tabs": [],
   "language": "zh",
   "bot_name": "Hermes",
   "sound_enabled": true,
@@ -27,5 +28,6 @@
   "sidebar_density": "compact",
   "auto_title_refresh_every": "10",
   "busy_input_mode": "queue",
-  "password_hash": "52b782f944cae328eb13d817c2fac28baa45fbc3d634bf0d4223e694bee25307"
+  "password_hash": "52b782f944cae328eb13d817c2fac28baa45fbc3d634bf0d4223e694bee25307",
+  "default_model_provider": "custom:zenmux"
 }

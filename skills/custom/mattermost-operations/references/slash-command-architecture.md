@@ -559,7 +559,48 @@ logger.info("Model switched: session=%s", session_key[:60])
 
 # ✅ 完整显示
 logger.info("Model switched: session=%s", session_key)
-### Pitfall 32：Channel/Thread 会话区分 — 直接读 payload root_id
+### Pitfall 34：插件迁移后双重 callback server 启动 — 端口冲突导致 DM 审批失效
+
+**症状**：插件化迁移完成后，DM 审批卡片不再弹出，Gateway 日志中出现 `OSError: [Errno 48] Address already in use` 或 callback server 启动失败。
+
+**根因**：源文件 `mattermost.py` 仍保留 patch 7c 的残留——`connect()` 中调用了 `await self._start_callback_server()`。插件覆写 `connect()` 时调用 `super().connect()` 触发源文件的 callback 启动，然后插件自己也调用 `await self._start_callback_server()`，导致同一端口启动两次。
+
+**调用链**：
+```
+插件 connect()
+  → super().connect()           # 源文件 connect() (patch 7c 残留)
+    → _start_callback_server()  # 第 1 次 — 成功绑定端口 18065
+  ← 返回 True
+  → _start_callback_server()    # 第 2 次 — 端口冲突！
+```
+
+**修复**：先回滚源文件至上游（`git show a91a57fa5:gateway/platforms/mattermost.py`），再让插件独立处理所有逻辑。插件保持 `connect()` 中 `super().connect()` + 自己的 `_start_callback_server()`，源文件不干涉。
+
+**迁移检查清单**（每次将 patch 从源文件迁移到插件后）：
+1. `grep "Hermes Patch" gateway/platforms/mattermost.py` — 应返回 0 匹配
+2. `grep "_callback_server\|_resolve_root_id\|send_exec_approval" gateway/platforms/mattermost.py` — 应返回 0 匹配
+3. 源文件行数应与上游一致（`git show a91a57fa5:gateway/platforms/mattermost.py | wc -l`）
+4. `bash -n hermes-patches.sh` — 语法检查
+5. 重启 Gateway 后 `grep "callback server on" gateway.log` — 应只有一条日志
+
+### Pitfall 35：`patch` 工具在 heredoc/f-string 大块删除时损坏文件
+
+**症状**：使用 `patch(mode='replace')` 删除 `hermes-patches.sh` 中上百行的 `_do_patch` 块时，工具只删除了匹配的前几行，将剩余的 Python heredoc 代码裸露为非法 shell 脚本。
+
+**根因**：`patch` 工具的 fuzzy matching 在遇到含 `\n`、`'''` triple-quote、f-string 花括号（`{variable}`）的文本时，escape 处理产生偏移，只匹配并删除了部分内容。
+
+**修复**：使用 `execute_code` + Python 的 line-based slicing 删除大块内容：
+
+```python
+with open('hermes-patches.sh') as f:
+    lines = f.readlines()
+# 精确删除 L524-L1015（patch 7 block）
+del lines[523:1015]
+with open('hermes-patches.sh', 'w') as f:
+    f.writelines(lines)
+```
+
+**关键原则**：对于 shell 脚本的大块修改（>20 行），**永远优先用 `execute_code` + line slicing**，不用 `patch` 工具。
 
 **症状**：在 Channel 顶层输入 `/model`，卡片被发到最近的 Thread 中；session_key 包含错误的 thread 后缀。
 
