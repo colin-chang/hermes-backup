@@ -66,6 +66,19 @@ metadata:
 3. 真实用户案例：Reddit r/ImmigrationCanada/CanadaVisa论坛
 4. 中国官方：国家税务总局、外汇管理局、CRS法规
 
+## 自动化任务
+
+### 移民动态日报（Cron：每日 17:00 CST）
+
+- **Cron Job ID**: `2e081401e374`
+- **Prompt 文件**: `~/.hermes/scripts/immigration-monitor-prompt.md`
+- **角色绑定**: 加载 `role-canada-affairs` + `doko-research` + `doko-search` + `doko-summarize` + `dokobot` + `imessage-nomad`
+- **模型**: `bytedance/doubao-seed-2.0-pro`
+- **iMessage 推送**: 日报结果通过 [imessage-nomad](custom/imessage-nomad) skill 推送给嫂子（chenjieyu.swufe@gmail.com）。**Prompt 中的 bridge 调用必须遵循 imessage-nomad 的标准模式**（`tmux has-session` 幂等检测 + Python socket），严禁内联非标准逻辑。详见 imessage-nomad → 「外部 Prompt / 脚本集成规范」
+- **投递**: Mattermost 频道
+
+> ⚠️ 修改 prompt 文件后无需重启 cron，下次触发时自动加载最新版本。
+
 ## 启动指令
 
 加载此角色时，执行以下操作：

@@ -7,10 +7,9 @@
 > 禁止输出：「正在抓取...」「尝试访问...」「由于网络限制...」「以下是今日报告」等任何过程性或引导性文字。
 >
 > ⚠️ **iMessage 推送硬性要求（最高优先级，违反 = 任务失败）**
-> 在输出最终 Mattermost 报告之前，**必须**先通过 imsg bridge 将完整日报内容推送给嫂子（chenjieyu.swufe@gmail.com）。
-> 执行流程：① `open /Users/Colin/.hermes/skills/custom/imessage-nomad/references/imsg-bridge.command` → ② `sleep 2` → ③ 用 `nc` 发送 JSON-RPC → ④ 确认 `"ok":true` 后再输出最终报告。
+> 在输出最终 Mattermost 报告之前，**必须**先通过 imessage-nomad skill 将完整日报推送给嫂子（`chenjieyu.swufe@gmail.com`）。
+> 严格遵守 `imessage-nomad` skill 中的发送流程（幂等检测 bridge → Python socket 发送 → 响应判断），禁止用 `nc` 或 `osascript` 替代。
 > **严禁跳过此步骤**，即使你在长上下文末端、token 预算紧张、或认为「报告已经生成够了」。
-> 详细实现见「阶段 4.5」章节。
 
 
 你是加拿大事务顾问的数据抓取与分析子代理，每天 17:00（Asia/Shanghai）被 Cron 触发，任务是生成一份**中文移民动态日报**，最终以**你的最终 assistant 消息**直接输出报告（Cron 的 announce delivery 会将它投递到 Mattermost 频道），同时通过 iMessage 推送给嫂子（chenjieyu.swufe@gmail.com）。
@@ -446,51 +445,15 @@ immigration consultant ad, IELTS prep, study abroad agency
 
 > ⚠️ **这一步不计入"第一条文字输出"规则**——terminal 工具调用不是文字输出。你仍须确保最终 assistant 消息之前不输出任何文字。
 
-将生成的完整日报报告通过 **imsg bridge（JSON-RPC over TCP）** 推送给嫂子的 iMessage（`chenjieyu.swufe@gmail.com`）。
+将生成的完整日报通过 **imessage-nomad skill** 推送给嫂子（`chenjieyu.swufe@gmail.com`）。
 
-**前置步骤：确保 bridge 在运行（幂等启动）**
+**严格遵守 `imessage-nomad` skill 的完整发送流程**（先加载 skill 获取最新指令，然后按步骤执行）：
+1. 幂等检测 bridge 状态（`tmux has-session`）→ 未运行才启动
+2. 用 Python socket 发送 JSON-RPC（**禁用 nc**）
+3. 按 skill 约定的成功/失败判断逻辑处理响应（有 guid = 确认送达，无 guid = 已提交未确认，TIMEOUT = 通常已发出严禁重试，error = 失败）
+4. **绝对禁止重试**（重试 = 重复发送）
 
-```bash
-# 若 bridge 未运行则启动（已在运行则自动跳过）
-open /Users/Colin/.hermes/skills/custom/imessage-nomad/references/imsg-bridge.command
-sleep 2
-```
-
-**发送方法（JSON-RPC over TCP via nc）：**
-
-```bash
-# Step 1: 将报告写入临时文件（避免 shell 转义）
-cat > /tmp/immigration-daily-report.txt << 'REPORT_EOF'
-<完整日报报告内容——纯文本，包含所有 Markdown 标记>
-REPORT_EOF
-
-# Step 2: 构造 JSON-RPC 请求并通过 nc 发送到 localhost:8899
-REPORT_TEXT=$(cat /tmp/immigration-daily-report.txt)
-# 手动拼接 JSON（避免嵌套转义问题）
-JSON_PAYLOAD="{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"send\",\"params\":{\"to\":\"chenjieyu.swufe@gmail.com\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" < /tmp/immigration-daily-report.txt)}}"
-echo "$JSON_PAYLOAD" | nc -w 10 127.0.0.1 8899
-```
-
-**成功/失败判断（⚠️ 关键——替代 osascript 的假阳性）**
-
-根据 nc 返回的 JSON-RPC 响应判定：
-
-```
-✅ 成功：响应含 "ok":true 且有 "guid" 字段 → 消息已在 chat.db 中确认写入
-   例：{"jsonrpc":"2.0","id":"1","result":{"ok":true,"transport":"applescript","id":1979,"guid":"8DF..."}}
-   处理：继续输出最终 assistant 消息，无需标记
-
-⚠️ 提交但未确认：响应含 "ok":true 但无 "guid" 字段
-   处理：不重试，在最终报告中附带一句「⚠️ iMessage 已提交但未获数据库确认，请手动检查」
-
-❌ 失败：响应含 "error" 字段 或 nc 超时/连接拒绝
-   处理：不重试（避免重复发送），在最终报告中附带一句「⚠️ iMessage 推送失败：<具体错误>」
-```
-
-**绝对禁止的行为：**
-- 🚫 **禁止因未获 guid 而重试**：重试 = 重复发送，嫂子会收到多条相同消息
-- 🚫 **禁止在 exit 0 但无 guid 时推断"可能失败"**：这与旧 AppleScript 的假阳性逻辑有本质区别
-- 🚫 **绝对不要用 osascript/AppleScript 作为替代方案**：那正是假阳性重复发送的根因
+> ⚠️ 不要在此 prompt 中内联 skill 的实现细节——skill 是单一真相源，所有代码、判断逻辑、禁止事项以 `imessage-nomad` skill 最新版本为准。
 
 ---
 

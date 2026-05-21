@@ -5,6 +5,20 @@
 
 ## 进行中的项目
 
+### Mattermost 统一插件 (mattermost-approval)
+- 状态：阶段二完成（DM 审批迁移），等待 gateway 重启验证
+- 阶段一 ✅：环境检查（Hermes v0.14.0 / plugins dir / register_platform API）
+- 阶段二 ✅：插件骨架创建（7 文件），config.yaml 已启用
+- 阶段三 ⏳：Slash 指令扩展（/model /new 卡片交互）
+- 阶段四 ⏳：收尾（API 契约文档 / patches 7 移除）
+- 插件位置：`~/.hermes/plugins/mattermost-approval/`
+- 开发计划：`~/.hermes/workspace/mm-plugin-development-plan.md`
+- 关键认知：
+  - register_platform() 实际 API：adapter_factory(工厂函数) + check_fn，非 adapter_class + priority
+  - Plugin 入口：register(ctx) 函数（非 on_load）
+  - _create_adapter() 先查 registry → 再 fallback 内置，无 priority 机制
+  - 阶段二子类用 pass 即可（全部继承父类 patches 代码）
+
 ### Obsidian 混合云站
 - 状态：架构设计完成，等待 Phase 1 (Next.js 初始化)
 - 架构：Obsidian+GitHub(CMS) → Cloudflare Pages → GCP Cloud Run
@@ -20,6 +34,14 @@
 - Chrome CDP：bb-browser daemon 模式，9222端口
 
 ## 技术决策记录
+
+### Ollama 本地模型性能调优（2026-05-19）
+- M2 Pro + 32GB 实测：上下文长度是 Apple Silicon 上 prefill 的头号瓶颈
+- qwen3.5 默认 262K context → prefill 仅 4 tok/s，限制到 16K → 53 tok/s（13x 提升）
+- qwen2.5-coder 20K diff 场景：88s → 15.3s（5.7x），通过 num_ctx=4096 + num_predict=128
+- Ollama 创建优化版模型 = Docker 分层：权重共享，仅新增 35-100B 参数层
+- VS Code Copilot Agent 模式不适合本地模型（多步串行 80-100s vs 云模型秒级）
+- 完整指南：`references/ollama-performance-tuning.md`
 
 ### Hermes IM 平台选型（2026-05-18）
 - Discord 渲染碎片化（3 根因）→ 短期配置修复 + 源码修复
@@ -50,6 +72,14 @@
 - `chrome://inspect` 不是开启 CDP 服务，只是客户端发现界面
 
 ## 消息平台替代评估
+
+### Mattermost Docker 部署（2026-05-19）
+- 项目路径：`/Users/Colin/Developer/Services/Mattermost`
+- 重启方式：`bash start.sh`（使用 `docker-compose.without-nginx.yml` 覆写）
+- 版本：Team Edition 11.7.0，镜像 `mattermost-team-edition:11.7.0`
+- 推送通知：使用 TPNS (`https://push-test.mattermost.com`)，日志 Warning 和移动端弹窗为假阳性，实际推送正常
+- 容器代理：已添加 `HTTP_PROXY=http://proxy.orb.internal:8305` 等环境变量
+- 详细参考：`references/mattermost-docker-push-notifications.md`
 
 ### Discord → Mattermost 迁移评估
 - 时间：2026-05-18

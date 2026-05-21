@@ -1,6 +1,6 @@
 # Hermes Patches 迁移计划：从源码 Patch 到上游 PR + 插件化
 
-> 审阅时间：2026-05-19 | 最后更新：2026-05-19 | Patch 脚本：`~/.hermes/scripts/hermes-patches.sh`（1270 行，15 patches）
+> 审阅时间：2026-05-19 | 最后更新：2026-05-22 | Patch 脚本：`~/.hermes/scripts/hermes-patches.sh`（15 patches）
 >
 > 📋 **详细开发计划**：[mm-plugin-development-plan.md](./mm-plugin-development-plan.md) — 插件架构设计、接口契约、卡片 UI 设计、迁移步骤、验证清单
 
@@ -227,6 +227,9 @@ _run.GatewayRunner._send_approval = _patched_send_approval
 1. 🔴 **先提 PR**（patches 1-5, 8b, 9-10c + patch 6）→ 收益最大，可能消除 13/15 patches
 2. 🟡 **统一插件开发**（patch 7 + `/model` + `/new`）→ 架构最优雅，一个插件覆盖所有 Mattermost 自定义能力
 3. 🟢 **run.py user_id 提 PR 或 .pth**（patch 8）→ 等阶段三验证后决定
+
+**✅ 已完成迁移：**
+- ~~Patch 11（send_typing Thread 路由）~~ → 已迁移至 `mattermost-approval` 插件的 `adapter.py`（`send_typing()` 覆写）。源码已回滚，`hermes-patches.sh` 已移除（2026-05-22）
 
 详细开发计划见 **[mm-plugin-development-plan.md](./mm-plugin-development-plan.md)**。
 

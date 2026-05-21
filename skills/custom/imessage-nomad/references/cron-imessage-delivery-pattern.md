@@ -15,9 +15,9 @@ Cron 触发
   ↓
 阶段 N+1：[terminal 调用，非文字输出]
   ├─ 检测 bridge 是否运行（tmux has-session -t imsg-bridge）
-  ├─ 未运行 → open <SKILL_DIR>/references/imsg-bridge.command && sleep 2
-  ├─ 写入临时文件 → Python socket 发 JSON-RPC
-  └─ 根据返回的 guid 判断成功/失败
+  ├─ ✅ 已运行 → 写入临时文件 → Python socket 发 JSON-RPC
+  ├─ ❌ 未运行 → **不尝试启动**（Hermes foreground terminal 拒绝），跳过 iMessage 侧送
+  └─ 根据返回的 guid 判断成功/失败（若跳过则标注 ⚠️）
   ↓
 最终文字输出：完整报告（含 ⚠️ 标记，如果有推送异常）
   ↓
@@ -26,16 +26,18 @@ Cron deliver → Mattermost / Discord 等网关平台
 
 **关键约束**：所有 `terminal` 调用发生在最终文字输出**之前**，不受「第一条文字输出」规则限制。
 
+> ⚠️ **Hermes Cron 环境的 bridge 启动限制**：`imsg-bridge.command` 使用 `tmux new-session -d`（后台模式），Hermes foreground terminal 会拒绝执行。**在 cron prompt 中，只检测 bridge 状态，不要尝试启动。** bridge 未运行 → 跳过 iMessage 侧送，标注 `⚠️ iMessage 推送跳过：bridge 未运行`。推荐将 bridge 部署为 LaunchAgent（系统守护进程），保证 cron 执行时始终可用。
+
 ## 模板代码
 
 > ⚠️ **严禁用 `echo '...' | nc`**：macOS nc 发完即关连接，JSON-RPC 响应被丢弃，导致"空响应→误判失败→重试→重复发送"的循环。
 
 ```bash
-# Step 0: 确保 bridge 运行（幂等）
-tmux has-session -t imsg-bridge 2>/dev/null || {
-    open <SKILL_DIR>/references/imsg-bridge.command
-    sleep 2
-}
+# Step 0: 检测 bridge 是否运行（不尝试启动——Hermes foreground terminal 会拒绝 .command）
+if ! tmux has-session -t imsg-bridge 2>/dev/null; then
+    echo "BRIDGE_DOWN"
+    exit 0
+fi
 
 # Step 1: 写入临时文件
 cat > /tmp/report.txt << 'REPORT_EOF'
@@ -80,6 +82,7 @@ s.close()
 | osascript 假阳性 | 永远返回 exit 0，无法判断送达 | **已弃用** |
 | bridge 未启动 | 连接拒绝 | 前置检测 + `open` |
 | open 异步 | bridge 还没准备好就发消息 | `sleep 2` |
+| Hermes 拒绝启动 bridge | `"Foreground command uses '&' backgrounding"`（`tmux -d` 被拦截） | 部署 LaunchAgent（见下方）或手动预先启动 bridge；Cron prompt 中检测到 bridge 未运行 → 跳过 iMessage 侧送并标注失败 |
 | shell 转义 | 报告中 `$`、反引号被展开 | Python `json.dumps()` 造 payload |
 
 ## ⛔ 已弃用：AppleScript heredoc 方案

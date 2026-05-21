@@ -16,10 +16,12 @@
 #   7.  gateway/platforms/mattermost.py   — DM 审批基础设施（4 处：init/callback/connect/disconnect + send_exec_approval）
 #   8.  gateway/run.py                    — 审批 user_id（8a）+ 工具进度进 Thread（8b，Mattermost 不依赖 source.thread_id）
 #   9.  utils.py                          — yaml.dump allow_unicode=True（中文 \\uXXXX）
-#   10. MEDIA 正则收紧                    — 修复 Mattermost 频道 file not found 噪声（3 处）
-#      a. gateway/run.py                  — 工具结果扫描：要求路径格式
-#      b. gateway/platforms/base.py       — extract_media() 去掉 \\S+ 兜底
-#      c. gateway/platforms/mattermost.py — 文件不存在时静默跳过
+#  10. MEDIA 正则收紧                    — 修复 Mattermost 频道 file not found 噪声（3 处）
+#     a. gateway/run.py                  — 工具结果扫描：要求路径格式
+#     b. gateway/platforms/base.py       — extract_media() 去掉 \\S+ 兜底
+#     c. gateway/platforms/mattermost.py — 文件不存在时静默跳过
+#
+#  ❌ 11. send_typing Thread 路由（已迁移到 mattermost-approval 插件）
 #
 # 使用方法：
 #   ./hermes-patches.sh check   # 检查当前状态（默认）
@@ -65,6 +67,7 @@ _patch_registry=(
     "gateway/run.py|run.py (MEDIA 工具结果扫描)|_TOOL_MEDIA_RE"
     "gateway/platforms/base.py|base.py (MEDIA 去兜底)|兜底分支"
     "gateway/platforms/mattermost.py|mattermost.py (MEDIA 静默跳过)|local file not found, skipping"
+    "gateway/platforms/mattermost.py|mattermost.py (send_typing Thread)|parent_id.*metadata"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1191,6 +1194,8 @@ PYEOF
     [[ $? -eq 0 ]] && media_ok=$((media_ok + 1))
 
     [[ $media_ok -gt 0 ]] && ok "MEDIA 正则收紧 — 已应用"
+
+
 }
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -8,6 +8,7 @@ custom_providers:
   - name: zenmux
     base_url: https://zenmux.ai/api/v1
     api_key: ${ZENMUX_API_KEY}
+    request_timeout_seconds: 300
     models:
       google/gemini-3.1-flash-lite:       # $0.25  Multimodal
         context_length: 1050000
@@ -21,8 +22,8 @@ custom_providers:
         context_length: 200000
       moonshotai/kimi-k2.6:               # $0.95  Multimodal
         context_length: 262140
-      qwen/qwen3.6-max-preview:           # $1.30
-        context_length: 262140
+      google/gemini-3.5-flash:           # $1.5
+        context_length: 1050000
       openai/gpt-5.3-codex:               # $1.75  Multimodal
         context_length: 400000
       google/gemini-3.1-pro-preview:      # $2.00  Multimodal
@@ -49,6 +50,7 @@ fallback_providers:
 model:
   provider: custom:zenmux
   default: deepseek/deepseek-v4-pro
+  read_timeout: 300
 
 # 辅助模型（均走 ZenMux）
 auxiliary:
@@ -93,6 +95,7 @@ agent:
 
 # 终端
 terminal:
+  cwd: ~/.hermes/workspace
   timeout: 600  # 默认 180
 
 # 网络搜索
@@ -143,6 +146,7 @@ plugins:
   enabled:
     - zenmux-image
     - zenmux-video
+    - mattermost-enhancer
 
 # ── 输出层 ──────────────────────────────────────────────────────────
 
@@ -254,11 +258,12 @@ platform_toolsets:
   google_chat:
     - hermes-google_chat
 
-# ── 终端 ────────────────────────────────────────────────────────────
 
-terminal:
-  cwd: ~/.hermes/workspace
+# ── 安全 ────────────────────────────────────────────────────────────
+# 允许解析到私有/保留 IP 的域名通过（本地 Mac 开发环境，DNS 返回 198.18.0.0/15）
+# 云元数据端点 (169.254.169.254) 仍被硬编码拦截，不受此开关影响
+security:
+  allow_private_urls: true
 
 # ── 全局 ────────────────────────────────────────────────────────────
-
 timezone: Asia/Shanghai
