@@ -62,6 +62,7 @@ _patch_registry=(
     "utils.py|config.yaml 中文变乱码：配置文件里的中文注释被保存成 \\uXXXX|allow_unicode=True"
     "gateway/run.py|聊天里莫名出现 (file not found: ...) 垃圾消息|_TOOL_MEDIA_RE"
     "gateway/platforms/base.py|同上：另一个文件提取路径也抓到了假文件路径|兜底分支"
+    "gateway/platforms/mattermost.py|Thread 里长时间任务的进度消息跑到频道去了|_raw_root = post.get"
     )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -450,6 +451,39 @@ else:
     [[ $? -eq 0 ]] && media_ok=$((media_ok + 1))
 
     [[ $media_ok -gt 0 ]] && ok "MEDIA 正则收紧 — 已装好 ✅"
+
+    # ── 11. mattermost.py Thread root_id fallback ────────────────────────────
+    _do_patch "gateway/platforms/mattermost.py" \
+        "Thread 里长时间任务的进度消息跑到频道去了" \
+        '_raw_root = post.get' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+old = '''        # Thread support: if the post is in a thread, use root_id.
+        thread_id = post.get("root_id") or None'''
+
+new = '''        # Thread support: if the post is in a thread, use root_id.
+        # When root_id is empty but CRT mode is enabled, the post itself IS
+        # the thread root — use post_id so progress/notification messages
+        # stay in the Thread instead of leaking to the channel.
+        _raw_root = post.get("root_id")
+        if _raw_root:
+            thread_id = _raw_root
+        elif self._reply_mode == "thread":
+            thread_id = post_id
+        else:
+            thread_id = None'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
 
 
 }
