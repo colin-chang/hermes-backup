@@ -465,14 +465,22 @@ old = '''        # Thread support: if the post is in a thread, use root_id.
         thread_id = post.get("root_id") or None'''
 
 new = '''        # Thread support: if the post is in a thread, use root_id.
-        # When root_id is empty but CRT mode is enabled, the post itself IS
-        # the thread root — use post_id so progress/notification messages
-        # stay in the Thread instead of leaking to the channel.
         _raw_root = post.get("root_id")
         if _raw_root:
             thread_id = _raw_root
         elif self._reply_mode == "thread":
-            thread_id = post_id
+            # root_id="" can mean either a genuine thread-root post OR a
+            # reply whose root_id was lost (Mattermost WebSocket anomaly).
+            # Ask the REST API before blindly trusting the WebSocket event.
+            try:
+                post_data = await self._api_get(f"posts/{post_id}")
+                api_root = post_data.get("root_id") if post_data else None
+                if isinstance(api_root, str) and api_root:
+                    thread_id = api_root
+                else:
+                    thread_id = post_id
+            except Exception:
+                thread_id = post_id
         else:
             thread_id = None'''
 

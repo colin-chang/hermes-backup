@@ -8,7 +8,8 @@
 
 | 修改位置 | 可插件化 | 方式 |
 |---------|:---:|------|
-| `mattermost.py` — Adapter 方法 | ✅ | 类覆写（`super()` 继承） |
+| `mattermost.py` — Adapter 方法（出站） | ✅ | 类覆写（`super()` 继承） |
+| `mattermost.py` — Adapter 方法（入站入口） | ❌ | 逻辑太重（~200 行），上游更新频繁断裂 |
 | `mattermost.py` — `__init__` 属性 | ✅ | 子类 `__init__` 覆写 + `super().__init__()` |
 | `mattermost.py` — `connect()/disconnect()` | ✅ | 子类覆写生命周期方法 |
 | `run.py` — 调用方传参（如 `user_id`） | ❌ | 只能上游 PR 或 `.pth` runtime 注入 |
@@ -256,23 +257,63 @@ else:
 
 ---
 
-## 8. 当前迁移状态
+## 9. 入站 vs 出站：插件化可行性分界线（P38 案例）
 
-| Patch | 文件 | 功能 | 状态 |
-|-------|------|------|:---:|
-| 6a-d | `mattermost.py` | `_resolve_root_id` | ✅ 插件 `send/_send_local/_send_url` 覆写 |
-| 7a-d | `mattermost.py` | DM 审批基础设施 | ✅ 插件 `send_exec_approval` 等 |
-| 10c | `mattermost.py` | MEDIA 静默跳过 | ✅ 插件 `_send_local_file` 覆写 |
-| 11 | `mattermost.py` | send_typing Thread 路由 | ✅ 插件 `send_typing` 覆写 |
-| 8b | `run.py` | progress reply 进 Thread | ✅ 插件 `send()` metadata.thread_id 降级已覆盖 |
-| 8 | `run.py` | send_exec_approval user_id | ⚠️ 无法插件化（调用方在 run.py） |
+### 10.1 核心结论
 
-**`mattermost.py` 源码：零修改** ✅
-**`hermes-patches.sh`：12 patches**（原 16，移除 4 个 Mattermost patch）
+**出站方法（send/send_typing/send_exec_approval 等）→ 可插件化 ✅**
+**入站入口方法（_handle_ws_event 等）→ 不可插件化 ❌**
+
+这不是方法名或可见性的问题，是方法**体量**和**上游耦合度**的问题。
+
+### 10.2 入站消息处理的数据流
+
+```
+_handle_ws_event()           [mattermost.py L670-867]
+  ├── 去重 (dedup)           [L697-698]
+  ├── 频道白名单过滤          [L713-731]
+  ├── @mention 检测+剥离      [L733-762]
+  ├── L768-786: thread_id 计算 ← P38 在这里
+  ├── 文件下载+缓存           [L790-831]
+  ├── build_source(thread_id=...) [L842-848]
+  └── handle_message(event)   [L867]
+```
+
+整个方法 ~200 行，包含消息处理的完整生命周期。`thread_id` 是局部变量，在传给 `build_source()` 之前就已确定。
+
+### 10.3 三条探索过的死路
+
+| 方案 | 问题 |
+|------|------|
+| 插件重写 `_handle_ws_event()` | ~200 行业务逻辑需全量复制，每次上游更新都可能断裂（比 source patch 更脆弱） |
+| 插件重写 `build_source()` | 太晚——调用方传的 `thread_id` 参数已经是错误值，重写也改不了 |
+| 插件重写 `handle_message()` 后篡改 `source.thread_id` | dirty hack；`source` 在 `handle_message()` 之前已被多处引用（session key 构建等），事后篡改有漏网风险 |
+
+### 10.4 对比：出站方法为什么能迁
+
+出站方法（`send`/`_send_local_file` 等）有**明确的接口契约**：
+
+```python
+async def send(self, chat_id: str, content: str,
+               reply_to: Optional[str] = None,
+               metadata: Optional[Dict] = None) -> SendResult:
+```
+
+参数和返回值类型固定，职责单一（构建 HTTP payload → 发帖）。插件子类可**完全控制**方法体，不依赖上游实现。上游更新不影响接口契约时不需要任何改动。
+
+### 10.5 判定标准
+
+判断一个 patch 能否迁入插件，问三个问题：
+
+1. 修补点在出站方法还是入站入口？
+2. 修补的逻辑是否自包含（< 30 行，无复杂依赖）？
+3. 是否可以通过修改方法入参/返回值实现，而非重写整个方法？
+
+三个全 Yes → 可迁。任何一个 No → 保持 source patch，提上游 PR 才是正道。
 
 ---
 
-## 9. Patch 标签人性化（新增）
+## 10. Patch 标签人性化
 
 ### 9.1 问题
 

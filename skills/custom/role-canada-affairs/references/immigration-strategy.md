@@ -52,15 +52,44 @@
 
 ## 3. 安省省提名 (OINP) 现状评估
 
-### OINP 硕士通道（Masters Graduate Stream）
+### OINP 硕士通道（Masters Graduate Stream）— ⚠️ 已实质关闭
 
-- **居住条件（已满足）**：嫂子 2024 年 12 月登陆安省滑铁卢，至 2026 年 1 月离开赴蒙特利尔，在安省合法居住约 13 个月，**已满足"申请提交前两年内在安省累计居住满 1 年"硬性条件**（累计制，允许中断）
-- **通道存续风险**：OINP 重设计计划于 2026 年下半年（Phase 2）取消硕士通道，**时间窗口极紧**
-- **结论**：居住障碍解除，核心风险转变为通道关闭时间节点
-- **行动**：每日关注 OINP Program Updates，确认 EOI 档案活跃，一旦非定向 Masters Graduate 抽签立即响应
+> **2026.05.22 调研结论：此通道对本案不再有效。理由有二：**
 
-### OINP 新通道（长期关注）
-- **Exceptional Talent Stream**：需专利/高影响力成果/重要奖项，门槛极高，CFA+双硕士可长期关注
+#### 理由一：通道将于 2026 年 5 月 30 日永久取消
+
+- 安省已通过监管变更，**2026年5月30日起全部9个现行OINP类别永久关闭**，替换为4个新整合通道
+- 来源：[immigration.ca](https://immigration.ca/ontario-immigration-draws/)、[CIC News](https://www.cicnews.com/2026/03/breaking-ontario-plans-to-overhaul-immigration-streams-by-end-of-may-2026-0373025.html)、[Liberty Immigration](https://libertyimmigration.ca/oinp-masters-and-phd-draw-2026-invites-918-major-changes-may-30/)
+- 家庭登陆时间为 2026 年 6 月，**晚于通道关闭日期**，时间上完全无法赶上
+
+#### 理由二：当前魁省居住构成合规障碍
+
+OINP 硕士通道居住要求（法律依据：[O.Reg 422/17 Section 8(3)](https://www.ontario.ca/laws/regulation/170422)，2026年5月从 e-Laws 核验的**现行合并文本**。⚠️ 旧版编号 8.4+8.7 已不再适用，现行法条将历史居住+申请时居住地合并为单一 Section 8(3)）：
+
+> **Section 8(3) 原文：** *"The applicant must have lawfully resided in Ontario for at least one of the last two years before the date of making the application **and**, at the time of making the application, must be lawfully residing in Ontario or residing outside of Canada."*
+
+这段话由 `and` 连接为一个整体：
+- 前半段：过去2年内在安省住满至少1年 → ✅ 妻子满足（滑铁卢 13 个月）
+- 后半段：提交申请时必须合法居住在安省或加拿大境外 → ❌ 妻子在蒙特利尔（魁省），不满足
+
+注意：虽然是单一法条，但 `and` 连接的两部分都须满足，法律效果不变。Section 8 下其他子条款为：8(0.1) 须获 ITA、8(0.2) 须证明资质、8(1) 安省硕士学位、8(2) 不得在读（除非持牌职业或全职工作）、8(4) CLB 7 语言、8(5) 安家资金。
+
+#### 2026 年抽签实录（供参考）
+
+| 抽签日期 | ITA 数量 | 备注 |
+|----------|---------|------|
+| 3月18日 | 900+ | 2026年首次，此前停摆近1.5年（上次2024.09.17） |
+| 4月22日 | 918 | Profile 截止 2026.04.20，多家媒体称可能为"最后一轮" |
+| 5月 | 无公告 | 截至 5月22日未有任何公告，5月27-28日理论窗口概率 30-40% |
+
+#### 结论
+
+**OINP 硕士通道对本案已不具备可操作性。不建议再投入精力监控。**
+
+### OINP 新通道（5月30日后关注）
+
+- **新4通道体系**：5月30日新规上线后公布细节，登陆后评估是否有适用通道
+- **Exceptional Talent Stream**：门槛极高（需专利/高影响力成果/重要奖项），CFA+双硕士可长期关注
 - **Employer Job Offer Stream**（合并版）：需安省雇主 Job Offer，当前不适用
 
 ---
@@ -85,7 +114,7 @@
    - PGWP 有效期至 2029 年 3 月
    - CEC 工作经验满 1 年：2027 年 3 月（届时可 CEC 建档入池）
    - FSW 可立即启动（4 年境外投行经验已满足）
-   - OINP 硕士通道居住有效窗口将于 2026 年 12 月起陆续滑出，**必须在 2026 年 12 月前完成申请提交**
+   - OINP 硕士通道已于 2026 年 5 月 30 日永久关闭（登陆前），本案不再适用；登陆后关注新 4 通道体系
 3. **居住证明留存**：妥善保存 Hawkesbury 租房合同、水电账单、银行对账单，为 CEC"打算居住在魁省以外"提供证据
 
 ---

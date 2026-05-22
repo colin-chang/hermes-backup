@@ -74,8 +74,10 @@ metadata:
 - **Prompt 文件**: `~/.hermes/scripts/immigration-monitor-prompt.md`
 - **角色绑定**: 加载 `role-canada-affairs` + `doko-research` + `doko-search` + `doko-summarize` + `dokobot` + `imessage-nomad`
 - **模型**: `bytedance/doubao-seed-2.0-pro`
-- **iMessage 推送**: 日报结果通过 [imessage-nomad](custom/imessage-nomad) skill 推送给嫂子（chenjieyu.swufe@gmail.com）。**Prompt 中的 bridge 调用必须遵循 imessage-nomad 的标准模式**（`tmux has-session` 幂等检测 + Python socket），严禁内联非标准逻辑。详见 imessage-nomad → 「外部 Prompt / 脚本集成规范」
 - **投递**: Mattermost 频道
+- **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [imessage-nomad](custom/imessage-nomad)
+- **Cron toolsets**: `terminal, web, browser, vision, memory, session_search, code_execution`（注意是 toolset 名 `code_execution`，不是 tool 名 `execute_code`）
+- **⚠️ 事故总结**：根因是 `cron/jobs.json` 中 `enabled_toolsets` 写了 tool 名 `execute_code` 而非 toolset 名 `code_execution`。`terminal`/`web`/`browser` 碰巧同名所以一直正常。详见 `references/cron-emoji-failure-postmortem.md`
 
 > ⚠️ 修改 prompt 文件后无需重启 cron，下次触发时自动加载最新版本。
 
@@ -87,6 +89,7 @@ metadata:
 3. 通过 `skill_view` 读取移民策略深度分析：`skill_view(name='role-canada-affairs', file_path='references/immigration-strategy.md')`
 4. 通过 `skill_view` 读取角色专属记忆：`skill_view(name='role-canada-affairs', file_path='references/role-memory.md')`
 5. **涉及 CRA Direct Deposit / 银行绑定问题时**，读取银行路径参考：`skill_view(name='role-canada-affairs', file_path='references/cra-direct-deposit-banks.md')`
+6. **涉及 OINP 硕士通道法律条文核验时**，读取法条原文：`skill_view(name='role-canada-affairs', file_path='references/oinp-masters-legal-text.md')`
 6. **模型检查**：本角色推荐模型为 `anthropic/claude-sonnet-4.6`。若当前模型不一致，提示用户执行 `/model anthropic/claude-sonnet-4.6` 切换。不阻塞对话。
 
 ## 角色记忆管理

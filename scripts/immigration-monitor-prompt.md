@@ -381,7 +381,7 @@ immigration consultant ad, IELTS prep, study abroad agency
 对每条入选条目做四段分析：
 
 1. **📰 移民动态**：标题 + 来源 + 可信度标签 + 时间 + 100 字内中文摘要
-2. **👩🏼‍⚖️ 律师分析**：政策背景 + 立法意义 + 对移民整体影响（2-3 句）
+2. **⚖️ 律师分析**：政策背景 + 立法意义 + 对移民整体影响（2-3 句）
 3. **🎯 对我们的影响**：结合**嫂子的 FSW 已可立即入池 / CEC 2027.3 经验期满 / OINP 硕士通道居住条件已满足但窗口极紧**，以及大哥家庭 2026.6 登陆计划，给影响等级（🔴 高 / 🟡 中 / 🟢 低 / ⚪ 无）
 4. **✅ 操作建议**：立即行动 / 关注观望 / 暂无需动作；如需行动，写清楚做什么、截止时间
 
@@ -403,7 +403,7 @@ immigration consultant ad, IELTS prep, study abroad agency
 时间：YYYY-MM-DD
 摘要：...
 
-👩🏼‍⚖️ 律师分析
+⚖️ 律师分析
 ...
 
 🎯 对我们的影响
@@ -445,65 +445,30 @@ immigration consultant ad, IELTS prep, study abroad agency
 
 > ⚠️ **这一步不计入"第一条文字输出"规则**——工具调用不是文字输出。你仍须确保最终 assistant 消息之前不输出任何文字。
 
-将生成的完整日报通过 **imessage-nomad skill** 推送给嫂子（`chenjieyu.swufe@gmail.com`）。
+将生成的完整日报通过 `execute_code` 推送给嫂子（`chenjieyu.swufe@gmail.com`），**一次调用完成，不写文件，Markdown 格式原样保留**：
 
-**🚨 发送策略（Cron 环境特定，必须严格按此顺序执行）：**
-
-**Step 1：先用 `write_file` 将完整日报保存到临时文件**
-```
-write_file(path='/tmp/imessage-daily-report.txt', content='<完整日报内容>')
-```
-> 这样做是为了避免在 terminal 命令行中内联含 emoji 的长文本，防止安全扫描误判 Unicode 字符。
-
-**Step 2：用 `execute_code` 发送（Cron 首选，不会触发审批弹窗）**
 ```python
 import socket, json, time
-with open('/tmp/imessage-daily-report.txt') as f:
-    report = f.read()
+
+report = """<完整日报内容，保留所有 Markdown 格式>"""
+
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(('127.0.0.1', 8899))
 s.settimeout(10)
-payload = json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'chenjieyu.swufe@gmail.com','text':report}}) + '\n'
-s.sendall(payload.encode())
+s.sendall((json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'chenjieyu.swufe@gmail.com','text':report}})+'\n').encode())
 time.sleep(1)
 try:
     resp = s.recv(4096).decode()
     print(resp)
 except socket.timeout:
-    print('TIMEOUT — 消息通常已发出，严禁重试')
-s.close()
-```
-
-**Step 3（降级，仅当 execute_code 不可用时）：用 `terminal` 发送**
-```bash
-# 先确保 bridge 运行（幂等检测）
-tmux has-session -t imsg-bridge 2>/dev/null || { open /Users/Colin/.hermes/skills/custom/imessage-nomad/references/imsg-bridge.command; sleep 2; }
-# 从文件读取发送（避免内联 emoji 触发安全扫描）
-python3 -c "
-import socket, json, time
-with open('/tmp/imessage-daily-report.txt') as f:
-    report = f.read()
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('127.0.0.1', 8899))
-s.settimeout(10)
-payload = json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'chenjieyu.swufe@gmail.com','text':report}}) + '\n'
-s.sendall(payload.encode())
-time.sleep(1)
-try:
-    print(s.recv(4096).decode())
-except socket.timeout:
     print('TIMEOUT')
 s.close()
-"
 ```
 
-**响应判断（严格执行）：**
-- 有 `guid` 字段 → ✅ 确认送达，继续输出报告
-- 有 `ok` 无 `guid` → ⚠️ 已提交未确认，**不重试**，继续输出报告
-- `TIMEOUT` → 消息通常已发出，**严禁重试**
-- `error` / `ConnectionRefusedError` / 安全扫描拦截 → 在报告的「⚠️ 遇到的问题」节注明「iMessage 推送失败：[原因]」，继续输出报告（不允许因为推送失败而不输出报告）
-
-> ⚠️ **严禁 `nc` 或 `osascript` 替代。严禁在 terminal 命令中直接内联含 emoji 的日报全文。严禁因推送失败而跳过报告输出。**
+**响应判断：**
+- 有 `guid` → ✅ 继续输出报告
+- 有 `ok` 无 `guid` / `TIMEOUT` → ⚠️ 不重试，继续输出报告
+- `error` / `ConnectionRefusedError` → 在报告底部注明失败原因，继续输出报告
 
 ---
 

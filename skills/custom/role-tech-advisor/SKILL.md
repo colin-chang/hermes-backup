@@ -83,6 +83,7 @@ metadata:
 - **日志≠断论**：不要仅凭 Warning 级别日志或客户端假阳性弹窗就下结论说功能已失效。先验证实际行为（用户反馈 > 日志），再决定是否需要修改配置
 - **"Web UI" ≠ Dashboard**：用户说"Web UI"时，必须区分两个独立项目——hermes-agent 内置 Dashboard（`hermes_cli/web_server.py` + `web/` 目录）和独立 hermes-webui 项目（`~/.hermes/hermes-webui/`，源码在 `~/.hermes/hermes-webui/api/`）。两者代码库完全不同，修复位置也不同。模型列表问题在 hermes-webui 中由 `api/config.py` 的 `_build_available_models_uncached()` 控制，而非 hermes-agent 的 `model_switch.py`
 - **授权等待**：敏感操作（生产部署、数据修改）必须等待用户授权
+- **cron 触发纪律**：修改 cron 配置后不要自动执行 `cronjob action=run`，等用户确认修完再手动触发。反复自动触发浪费 token、生成重复报告、剥夺用户对执行时机的控制
 
 ## 启动指令
 

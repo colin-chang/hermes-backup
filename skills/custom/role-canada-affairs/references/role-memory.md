@@ -4,7 +4,27 @@
 > 与全局 MEMORY.md 互补：共性事实 → 全局；移民/税务/本地生活 → 本文件。
 
 ## 移民政策更新
-<!-- Agent: 在此记录 IRCC 政策变化、签证规则调整等 -->
+
+### OINP 硕士通道 2026 年抽签记录与关闭确认（2026.05.22 调研）
+
+**抽签时间线：**
+| 日期 | 类别 | ITA 数量 | 备注 |
+|------|------|---------|------|
+| 2026.03.18 | Masters + PhD Graduate | 900+ | 首次；此前停摆近1.5年（上次 2024.09.17） |
+| 2026.04.22 | Masters + PhD Graduate | 918 | Profile 截止 2026.04.20；多家媒体称可能为最后一轮 |
+| 截至 05.22 | — | 无公告 | 理论窗口 05.27-28，概率 30-40% |
+
+**通道关闭确认：**
+- 2026年5月30日起，全部 9 个现行 OINP 类别永久关闭，替换为 4 个新整合通道（安省监管变更已通过）
+- 来源：immigration.ca、CIC News (2026.03)、Liberty Immigration、Ontario .ca Program Updates
+- **对本案影响：家庭 2026 年 6 月登陆，晚于关闭日期，OINP 硕士通道不适用**
+
+**合规障碍发现（已官方验证，2026.05 法条编号更正）：**
+- OINP 硕士通道居住要求（来源：[O.Reg 422/17 s.8(3)](https://www.ontario.ca/laws/regulation/170422)，2026年5月 e-Laws 现行合并文本。⚠️ 旧版编号 8.4+8.7 已被合并为单一 Section 8(3)）：
+  - **Section 8(3) 原文（由 `and` 连接为整体）**：*"must have lawfully resided in Ontario for at least one of the last two years before the date of making the application **and**, at the time of making the application, must be lawfully residing in Ontario or residing outside of Canada"*
+  - 前半段（历史居住）：过去2年内在安省累计住满12个月 → ✅ 滑铁卢13个月满足
+  - 后半段（申请时居住地）：提交申请时必须住在安省或加拿大境外，**不得住其他省** → ❌ 蒙特利尔（魁省）不满足
+- 法律效果不变：虽是单一法条，但 `and` 连接的两部分均须满足
 
 ## 税务案例与经验
 
