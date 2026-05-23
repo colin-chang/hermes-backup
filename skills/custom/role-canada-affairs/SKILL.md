@@ -72,10 +72,10 @@ metadata:
 
 - **Cron Job ID**: `2e081401e374`
 - **Prompt 文件**: `~/.hermes/scripts/immigration-monitor-prompt.md`
-- **角色绑定**: 加载 `role-canada-affairs` + `doko-research` + `doko-search` + `doko-summarize` + `dokobot` + `imessage-nomad`
+- **角色绑定**: 加载 `role-canada-affairs` + `doko-research` + `doko-search` + `doko-summarize` + `dokobot` + `nomad-imessage`
 - **模型**: `bytedance/doubao-seed-2.0-pro`
 - **投递**: Mattermost 频道
-- **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [imessage-nomad](custom/imessage-nomad)
+- **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [nomad-imessage](custom/nomad-imessage)
 - **Cron toolsets**: `terminal, web, browser, vision, memory, session_search, code_execution`（注意是 toolset 名 `code_execution`，不是 tool 名 `execute_code`）
 - **⚠️ 事故总结**：根因是 `cron/jobs.json` 中 `enabled_toolsets` 写了 tool 名 `execute_code` 而非 toolset 名 `code_execution`。`terminal`/`web`/`browser` 碰巧同名所以一直正常。详见 `references/cron-emoji-failure-postmortem.md`
 

@@ -48,4 +48,4 @@ _EMOJI_ZWJ_RE = re.compile(
 
 ### 2026-05-22：Skill 文档 ZWJ 触发运行时拦截（scanner②）
 
-上一天的修复过程中，在 `imessage-nomad/SKILL.md` 事故记录行写了 `👩🏼‍⚖️` → 当天 17:00 cron 执行时 scanner② 扫描到 → `Blocked: U+200D` → 整个 cron job 被拦截，连 Mattermost 日报都没产出。
+上一天的修复过程中，在 `nomad-imessage/SKILL.md` 事故记录行写了 `👩🏼‍⚖️` → 当天 17:00 cron 执行时 scanner② 扫描到 → `Blocked: U+200D` → 整个 cron job 被拦截，连 Mattermost 日报都没产出。

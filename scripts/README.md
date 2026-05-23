@@ -158,7 +158,7 @@ stdout 输出摘要报告，详细日志写入 `~/.hermes/logs/cleanup.log`。
 - **小红书：** 10 组关键词 + 博主 DecisionMade
 - **补充搜索：** Brave Search 5 组关键词
 
-**触发方式：** 由 Cron 定时任务 `"加拿大移民日报"`（Job ID: `2e081401e374`）每日 17:00 CST 触发，自动加载 `role-canada-affairs` + `doko-*` + `imessage-nomad` skills，使用 `doubao-seed-2.0-pro` 模型。
+**触发方式：** 由 Cron 定时任务 `"加拿大移民日报"`（Job ID: `2e081401e374`）每日 17:00 CST 触发，自动加载 `role-canada-affairs` + `doko-*` + `nomad-imessage` skills，使用 `doubao-seed-2.0-pro` 模型。
 
 **何时修改：** 需要调整信源、过滤规则、报告模板或 iMessage 推送策略时。
 

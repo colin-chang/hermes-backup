@@ -80,9 +80,9 @@ last_error: "Blocked: prompt contains invisible unicode U+200D (possible injecti
 
 ---
 
-## P43：子代理使用 imessage-nomad skill 的正确姿势
+## P43：子代理使用 nomad-imessage skill 的正确姿势
 
-**背景：** cron job 的 `skills` 数组配置了 `imessage-nomad`，Skill 内容被注入系统 prompt，子代理能看到 Skill 指令。但子代理只能用 `enabled_toolsets` 中的工具来执行，而 `skills` toolset（含 `skill_view`）通常不在 cron toolsets 中。
+**背景：** cron job 的 `skills` 数组配置了 `nomad-imessage`，Skill 内容被注入系统 prompt，子代理能看到 Skill 指令。但子代理只能用 `enabled_toolsets` 中的工具来执行，而 `skills` toolset（含 `skill_view`）通常不在 cron toolsets 中。
 
 **正确做法：**
 1. Skill 内容作为**知识源**注入子代理的系统 prompt

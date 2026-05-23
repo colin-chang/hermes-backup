@@ -137,7 +137,7 @@ skills/creative/touchdesigner-mcp/
 
 # ── 用户自建 Skill 目录（全部追踪） ───────────────────────────────────────────
 # skills/custom/ 下的所有内容自动纳入 Git 管理
-# 当前清单：hermes-weekly-cleanup, imessage-nomad, role-canada-affairs,
+# 当前清单：hermes-weekly-cleanup, nomad-imessage, role-canada-affairs,
 #   role-content-ops, role-investment-advisor, role-parenting-expert,
 #   role-tech-advisor, tool-selection-strategy
 

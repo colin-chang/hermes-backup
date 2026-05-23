@@ -61,16 +61,16 @@ _patch_registry=(
     "cron/jobs.py|定时任务中文变乱码：描述里的汉字全变成 \\uXXXX 转义符|ensure_ascii=False"
     "utils.py|config.yaml 中文变乱码：配置文件里的中文注释被保存成 \\uXXXX|allow_unicode=True"
     "gateway/run.py|聊天里莫名出现 (file not found: ...) 垃圾消息|_TOOL_MEDIA_RE"
-    "gateway/platforms/base.py|同上：另一个文件提取路径也抓到了假文件路径|兜底分支"
+    "gateway/platforms/base.py|同上：另一个文件提取路径也抓到了假文件路径|\\$))"
     "gateway/platforms/mattermost.py|Thread 里长时间任务的进度消息跑到频道去了|_raw_root = post.get"
+    "gateway/run.py|Clarify 问题等待回复时用户回复被当成新会话（Session 分裂，Agent 答非所问）|_canonical_entry = self.session_store.get_or_create_session"
+    "gateway/run.py|Clarify concurrency guard: 防止 clarify 阻塞期间新消息创建重复 Session|Gateway intercepted clarify at session guard"
     )
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 辅助函数
 # ═══════════════════════════════════════════════════════════════════════════
 
-# 执行一个 Python 替换 patch。
-# 使用: _do_patch <file_rel> <label> <check_grep> <<'PYEOF' ... PYEOF
 #   heredoc 必须是完整的 Python 脚本，用 sys.argv[1] 获取文件路径，
 #   输出 "APPLIED" 或 "SKIP"。
 #   返回 0 = 已应用或成功；返回 1 = 文件不存在或失败
@@ -427,28 +427,26 @@ PYEOF
     [[ $? -eq 0 ]] && media_ok=$((media_ok + 1))
 
     # 10b. base.py — 去掉 |\S+ 兜底
-    local base_file="${AGENT_DIR}/gateway/platforms/base.py"
-    if [[ -f "$base_file" ]]; then
-        python3 -c "
+    _do_patch "gateway/platforms/base.py" \
+        "同上：另一个文件提取路径也抓到了假文件路径" \
+        '|\\$))' <<'PYEOF'
 import sys
-with open('$base_file', 'rb') as f:
-    raw = f.read()
-# 精确移除 extract_media() 中的 |\\\\S+ 兜底分支
-old = b'|\\$)|\\\\\\\\S+)'
-new = b'|\\$))'
-if old in raw:
-    raw = raw.replace(old, new)
-    with open('$base_file', 'wb') as f:
-        f.write(raw)
-    print('APPLIED')
-else:
-    print('SKIP')
-" 2>/dev/null && media_ok=$((media_ok + 1)) || true
-    else
-        error "gateway/platforms/base.py 不存在，跳过"
-    fi
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
 
-    [[ $? -eq 0 ]] && media_ok=$((media_ok + 1))
+# Remove |\S+ fallback from extract_media() regex that captures non-path tokens
+old = "|$)|\\S+)[`\"']?'''"
+new = "|$))[`\"']?'''"
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
 
     [[ $media_ok -gt 0 ]] && ok "MEDIA 正则收紧 — 已装好 ✅"
 
@@ -487,6 +485,97 @@ new = '''        # Thread support: if the post is in a thread, use root_id.
 if old in content:
     content = content.replace(old, new)
     with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── P46: Clarify Session 分裂 ───────────────────────────────────────────
+    _do_patch "gateway/run.py" \
+        "Clarify 问题等待回复时用户回复被当成新会话（Session 分裂，Agent 答非所问）" \
+'_canonical_entry = self.session_store.get_or_create_session' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+old = '''            _pending_clarify = _clarify_mod.get_pending_for_session(_quick_key)
+        except Exception:
+            _pending_clarify = None'''
+
+new = '''            _pending_clarify = _clarify_mod.get_pending_for_session(_quick_key)
+            # P46 fix: when _quick_key doesn't match (e.g. due to
+            # thread_sessions_per_user config mismatch), fall back to the
+            # canonical session key from get_or_create_session.  Without
+            # this, the clarify is not found → message falls through
+            # → a new Session is created → two Sessions run in parallel
+            # in the same Thread (Session split).
+            # Guard: only in Thread contexts where session key mismatch
+            # can actually occur.  Non-Thread paths (DM, channel root)
+            # always have _quick_key == canonical key, and calling
+            # get_or_create_session here breaks Telegram topic mode
+            # lobby (which asserts it's never called).
+            if _pending_clarify is None and source.thread_id:
+                try:
+                    _canonical_entry = self.session_store.get_or_create_session(source)
+                    _canonical_key = _canonical_entry.session_key
+                    if _canonical_key != _quick_key:
+                        _pending_clarify = _clarify_mod.get_pending_for_session(_canonical_key)
+                except Exception:
+                    pass
+        except Exception:
+            _pending_clarify = None'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+
+    # ── P46b: Clarify concurrency guard  ─────────────────────────────────
+    _do_patch "gateway/run.py" \
+        "Clarify concurrency guard: _handle_message_with_agent intercept" \
+        'Gateway intercepted clarify at session guard' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, "r") as f:
+    content = f.read()
+
+old = "        session_key = session_entry.session_key\n        self._cache_session_source(session_key, source)"
+
+new = "        session_key = session_entry.session_key\n"
+new += "        # P46 concurrency guard: belt-and-suspenders clarify check using\n"
+new += "        # the canonical session key.  The earlier check in _handle_message\n"
+new += "        # uses _quick_key which may differ from session_key when\n"
+new += "        # thread_sessions_per_user configs diverge.  When keys differ and\n"
+new += "        # no agent is found in _running_agents under _quick_key, a new\n"
+new += "        # Session is spawned before the clarify-blocked agent can respond.\n"
+new += "        if session_key != _quick_key:\n"
+new += "            try:\n"
+new += '                from tools import clarify_gateway as _clarify_mod2\n'
+new += "                _pc = _clarify_mod2.get_pending_for_session(session_key)\n"
+new += "                if _pc is not None:\n"
+new += '                    _raw = (event.text or "").strip()\n'
+new += '                    if _raw and not _raw.startswith("/"):\n'
+new += "                        _clarify_mod2.resolve_gateway_clarify(_pc.clarify_id, _raw)\n"
+new += "                        logger.info(\n"
+new += '                            "Gateway intercepted clarify at session guard "\n'
+new += '                            "(session=%s, clarify_id=%s)",\n'
+new += "                            session_key, _pc.clarify_id,\n"
+new += "                        )\n"
+new += "                        return None  # consumed by clarify -- no new turn\n"
+new += "            except Exception:\n"
+new += "                pass\n"
+new += "        self._cache_session_source(session_key, source)"
+
+if old in content:
+    content = content.replace(old, new, 1)
+    with open(file_path, "w") as f:
         f.write(content)
     print("APPLIED")
 else:

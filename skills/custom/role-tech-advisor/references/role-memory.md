@@ -96,8 +96,8 @@
 <!-- Agent: 在此记录值得保留的配置经验 -->
 
 ### iMessage 发送（2026-05-19）
-- 始终加载 `imessage-nomad`（非 builtin `imessage`，后者 bridge 路径已失效）
-- 加载方式：`/skill imessage-nomad` 或自然语言触发
-- Bridge 脚本在 skill 内：`~/.hermes/skills/custom/imessage-nomad/references/imsg-bridge.command`
+- 始终加载 `nomad-imessage`（非 builtin `imessage`，后者 bridge 路径已失效）
+- 加载方式：`/skill nomad-imessage` 或自然语言触发
+- Bridge 脚本在 skill 内：`~/.hermes/skills/custom/nomad-imessage/references/imsg-bridge.command`
 - 发送前自动检测 bridge 运行状态（`tmux has-session`），未运行则 `open` + `sleep 2`
 - 禁止使用 `osascript send`（假阳性根因：永远返回 exit 0，已导致 4 次重复发送事故）

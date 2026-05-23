@@ -62,3 +62,30 @@
 ## P38 的妥协方案
 
 P38 的增强版（API 反查）留在 `hermes-patches.sh`，PR 提交给上游的是最小修复版（无 API 调用）——两者通过同一个 grep 检测共存，上游合入后 patch 自动跳过。
+
+## 案例研究：P46/P46b — 双归属策略（2026-05-23 更新）
+
+> 评估日期：2026-05-23
+
+### 场景
+
+P46（clarify session 分裂）和 P46b（concurrency guard）都修改 `gateway/run.py`——这与插件脚本中已有的两个补丁（DM 审批 `user_id`、工具进度 `Platform.MATTERMOST`）修改的是同一个文件。
+
+### 最终决策：双归属
+
+P46/P46b 是通用 Gateway bug（影响所有 Thread 平台），但 Mattermost CRT 用户是其**主要受害者**（CRT Thread 模式 + clarify 卡片渲染缺失 → 双重加剧）。
+
+- **全局 `hermes-patches.sh`**：保留 P46 + P46b（我们本机使用）
+- **插件 `hermes-mattermost-enhancer.sh`**：增加 Patch 3 (P46) + Patch 4 (P46b)（面向第三方 Mattermost 用户，他们只有插件脚本，没有全局脚本）
+- **`source.thread_id` 守卫**确保非 Thread 场景（Telegram DM lobby 等）不受影响
+- 两处共享相同的 check_grep，防重复应用
+
+### 新的分类原则（更新）
+
+```
+这个补丁 Mattermost 用户需要吗？
+├── ✅ 仅 Mattermost 需要 → 插件脚本（user_id, progress_reply_to）
+├── ✅ Mattermost 用户也需要 → 双归属（P46/P46b）
+│   全局脚本保留（我们本机）+ 插件脚本也加（第三方用户）
+└── ❌ Mattermost 无关 → 仅全局脚本（MEDIA 正则, config 桥接...）
+```

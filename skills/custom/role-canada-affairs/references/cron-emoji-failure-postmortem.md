@@ -35,7 +35,7 @@
 
 1. **配置修正**：`cron/jobs.json` 的 `enabled_toolsets` 中 `"execute_code"` → `"code_execution"`
 2. **源头清 ZWJ**：模板中 女性法官组合emoji → `⚖️`，所有含 ZWJ 的组合 emoji 替换为基础 emoji
-3. **Skill 文档禁 ZWJ**：imessage-nomad 的 SKILL.md 和 references 中不留含 ZWJ 的 emoji
+3. **Skill 文档禁 ZWJ**：nomad-imessage 的 SKILL.md 和 references 中不留含 ZWJ 的 emoji
 4. **`execute_code` 直接内联发送**：不写文件，日报放 Python 字符串中，一次调用完成，Markdown 原样保留
 
 ## 教训

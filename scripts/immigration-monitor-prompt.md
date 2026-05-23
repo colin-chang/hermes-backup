@@ -7,8 +7,8 @@
 > 禁止输出：「正在抓取...」「尝试访问...」「由于网络限制...」「以下是今日报告」等任何过程性或引导性文字。
 >
 > ⚠️ **iMessage 推送硬性要求（最高优先级，违反 = 任务失败）**
-> 在输出最终 Mattermost 报告之前，**必须**先通过 imessage-nomad skill 将完整日报推送给嫂子（`chenjieyu.swufe@gmail.com`）。
-> 严格遵守 `imessage-nomad` skill 中的发送流程（幂等检测 bridge → Python socket 发送 → 响应判断），禁止用 `nc` 或 `osascript` 替代。
+> 在输出最终 Mattermost 报告之前，**必须**先通过 nomad-imessage skill 将完整日报推送给嫂子（`chenjieyu.swufe@gmail.com`）。
+> 严格遵守 `nomad-imessage` skill 中的发送流程（幂等检测 bridge → Python socket 发送 → 响应判断），禁止用 `nc` 或 `osascript` 替代。
 > **严禁跳过此步骤**，即使你在长上下文末端、token 预算紧张、或认为「报告已经生成够了」。
 
 
