@@ -36,6 +36,17 @@ custom_providers:
         context_length: 1050000
       openai/gpt-5.5-pro:                 # $30.0  Multimodal
         context_length: 400000
+  - name: vertex
+    base_url: http://localhost:8899/v1
+    api_key: noop
+    model: gemini-3.1-flash-lite
+    models:
+      gemini-3.1-flash-lite:
+        context_length: 1048576
+      gemini-3.5-flash:
+        context_length: 1048576
+      gemini-3.1-pro-preview:
+        context_length: 2097152
 
 # 备用模型商（主提供商不可用时按顺序故障转移）
 fallback_providers:
@@ -157,6 +168,11 @@ display:
   bell_on_complete: true
   show_cost: true
   background_process_notifications: all
+  runtime_footer:
+    enabled: true
+    fields:
+      - model
+      - context_pct  
   platforms:
     mattermost:
       streaming: true

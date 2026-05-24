@@ -3,29 +3,29 @@
 > 本文件存储技术顾问角色的领域知识，由 Agent 在对话中自动更新。
 > 与全局 MEMORY.md 互补：共性事实 → 全局；领域知识 → 本文件。
 
-## 进行中的项目
 
-### Mattermost 统一插件 (mattermost-approval)
-- 状态：阶段二完成（DM 审批迁移），等待 gateway 重启验证
-- 阶段一 ✅：环境检查（Hermes v0.14.0 / plugins dir / register_platform API）
-- 阶段二 ✅：插件骨架创建（7 文件），config.yaml 已启用
-- 阶段三 ⏳：Slash 指令扩展（/model /new 卡片交互）
-- 阶段四 ⏳：收尾（API 契约文档 / patches 7 移除）
-- 插件位置：`~/.hermes/plugins/mattermost-approval/`
-- 开发计划：`~/.hermes/workspace/mm-plugin-development-plan.md`
-- 关键认知：
-  - register_platform() 实际 API：adapter_factory(工厂函数) + check_fn，非 adapter_class + priority
-  - Plugin 入口：register(ctx) 函数（非 on_load）
-  - _create_adapter() 先查 registry → 再 fallback 内置，无 priority 机制
-  - 阶段二子类用 pass 即可（全部继承父类 patches 代码）
-
-### Obsidian 混合云站
-- 状态：架构设计完成，等待 Phase 1 (Next.js 初始化)
-- 架构：Obsidian+GitHub(CMS) → Cloudflare Pages → GCP Cloud Run
+### Vertex Monitor — Vertex AI 预算代理（v3.3，2026-05-24）
+- 路径：`/Users/Colin/Developer/Services/VertexMonitor`
+- 架构：FastAPI + liteLLM SDK（非 Proxy）+ 双页 Web UI（仪表盘 + 设置）+ i18n 双语（en/zh-CN）
+- 仪表盘：Chart.js 暗色主题图表（消费占比环形图 + Token 用量堆叠柱状图）+ 数据表格 + 调用历史
+- 设置页：表单前置校验（非空/JSON/数值范围），按钮联动（Key+模型→测试启用），保存后热加载配置
+- i18n：`static/i18n.js` 翻译引擎，`data-i18n` 属性 + `i18n.t()` API，右上角语言选择器，localStorage 持久化
+- 流式兼容：SSE 包装模式（检测 `stream:true` → 内部 `stream=false` → delta+finish+[DONE] 三块 SSE）
+- ⚠️ Docker 镜像层只读：Key 文件必须写入 `/app/data/`（数据卷），非 `/app/`
+- ⚠️ Chart.js `generateLabels` 不继承 `labels.color`，必须显式设 `fontColor`
+- 静态文件：`app.mount("/static", StaticFiles(...))` 服务 i18n.js
+- GitHub 就绪：14 文件清单，`.gitignore` 排除凭证/数据/缓存，`data/.gitkeep` 保目录
+- 前端模式详见 `references/frontend-dark-ui-patterns.md`
 
 ### Google Sheets 指挥中心
 - Master Sheet ID: `10ujCdTHQZKcSxPpbpu3G8myMHUV2V13dhniGRTdK0wU`
 - 结构：Overview / Content / Finance
+
+### Mattermost 统一插件 (mattermost-enhancer)\n- 状态：✅ 全部完成（12 源码补丁已迁入插件，mattermost.py 零修改）\n- 插件位置：`~/.hermes/plugins/mattermost-enhancer/`\n- GitHub：`colin-chang/hermes-plugin-mattermost-enhancer`\n- 涵盖能力：\n  - DM 审批（交互卡片 + 回调服务器 + asyncio.Lock 防竞态）\n  - /model 模型切换（select 下拉 + session override + pending_model_notes）\n  - Channel → Thread 模型继承（pre_gateway_dispatch hook）\n  - /new 会话重置（确认卡片）\n  - Clarify 交互卡片渲染（按钮选项 + 「其他」文本输入）\n  - Thread root_id 解析（覆写 send/send_typing/send_local_file/send_url_as_file）\n  - MEDIA 文件缺失静默跳过\n  - **Runtime Footer 内联合并**（v2.2.0，2026-05-24）：流式模式下 footer 不再独立发帖，\n    检测 ` · ` 分隔符 → 编辑上一条 Bot 消息 → 水平线+斜体脚注
+
+### Obsidian 混合云站
+- 状态：架构设计完成，等待 Phase 1 (Next.js 初始化)
+- 架构：Obsidian+GitHub(CMS) → Cloudflare Pages → GCP Cloud Run
 
 ## 开发环境与工具
 
@@ -92,8 +92,37 @@
 - 不支持：表格、标题 H1-H6、有序/无序列表、LaTeX、HTML 标签
 - 不适合作为 AI Agent 长内容输出平台
 
+
 ## 配置细节
-<!-- Agent: 在此记录值得保留的配置经验 -->
+
+### Web UI 用户反馈偏好（2026-05-24）
+- **通知消息用居中模态弹窗**，不要用角落 toast
+- **确认操作用自定义暗色弹窗**，不用浏览器 `confirm()`
+- **日期用中文格式**（2026年6月30日），不用 `toLocaleString`
+- 所有弹窗支持：点击遮罩关闭 + ESC 关闭
+
+### liteLLM SDK 响应处理陷阱（2026-05-24）
+- `litellm.completion()` 返回 `ModelResponse` 对象，**不是 dict**
+- 取 `usage`/`choices` 前必须 `resp.model_dump()` 转 dict
+- `litellm.completion_cost()` 可直接接受 `ModelResponse`，无需转换
+
+### Docker 容器网络绑定（2026-05-24）
+- FastAPI/uvicorn 默认 `host="127.0.0.1"` 在容器内只监听 loopback，宿主机端口映射无效
+- 容器化部署必须设 `host="0.0.0.0"`（通过环境变量 `HOST` 传入）
+- docker-compose 中设 `environment: - HOST=0.0.0.0`
+
+### Web UI 自动刷新覆盖用户输入（2026-05-24）
+- 场景：`setInterval` 定期刷新时，服务器状态会覆盖用户未保存的表单编辑（如 Tab 切换）
+- 方案：引入 `dirty` 标志
+  - 用户点击 Tab / 修改表单 → `dirty = true` → 显示警告提示
+  - 自动刷新到达 → 若 `dirty` 则跳过表单更新，仅刷新只读概览数字
+  - 保存成功后 → `dirty = false` → 恢复正常刷新
+- 适用于所有有自动刷新 + 表单编辑的 Web UI
+
+### Gemini 3.1 thinking tokens 截断（2026-05-24）
+- Gemini 3.1 系列模型在 `max_tokens` 极低（如 5-10）时可能返回 `content: null`
+- 原因：模型消耗 token 用于内部推理（thinking blocks），输出 token 不够
+- 解决：`max_tokens` 至少设 20+，推荐 50+
 
 ### iMessage 发送（2026-05-19）
 - 始终加载 `nomad-imessage`（非 builtin `imessage`，后者 bridge 路径已失效）

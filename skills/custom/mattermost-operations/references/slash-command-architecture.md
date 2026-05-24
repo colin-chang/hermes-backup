@@ -173,6 +173,63 @@ def _build_session_key(self, channel_id: str, root_id: Optional[str]) -> str:
   → 用户发下条消息 → Gateway 注入 pending_model_note → LLM 正确自报新模型
 ```
 
+### Channel → Thread 模型继承（v2.1.0 新增）
+
+**功能**：用户在 Channel 中通过 `/model` 切换模型后，新创建的 Thread 自动继承 Channel 的模型设置。
+
+**实现**：`__init__.py` 注册 `pre_gateway_dispatch` hook，在消息处理最早阶段（模型解析之前）检测 Thread 消息并注入继承逻辑。
+
+**流程**：
+```
+1. 用户在频道输入 /model → 选模型 M → Channel session 写入 override
+2. 用户回复任意消息（创建 CRT Thread）
+3. pre_gateway_dispatch hook 触发
+4. 检测：event source 有 thread_id → 是 Thread 消息
+5. 推导 Thread session_key 和父 Channel session_key
+6. Thread key 无 override + Channel key 有 override → copy(dict)
+7. Gateway 后续 _resolve_session_agent_runtime() 读取 thread override
+8. Thread 使用模型 M ✅
+```
+
+**规则**：
+| 场景 | 行为 |
+|------|------|
+| Channel 切过模型 → 开 Thread | Thread 继承 Channel 模型 |
+| Channel 没切过模型 → 开 Thread | Thread 走全局默认（不变） |
+| Thread 已有独立 override | **不覆盖**（用户已在 Thread 内独立切模型） |
+| Thread 继承后自己 `/model` | 仅影响该 Thread，不反向污染 Channel |
+| Channel session 被 GC 清除 | Thread 回退全局默认（无父 override 可继承） |
+
+**关键设计**：hook 返回 `{"action": "allow"}` 始终放行消息。只在检测到「Thread 无 override + Channel 有 override」时注入，无副作用，不影响消息处理流程。
+
+```python
+def _model_inheritance_hook(event, gateway, session_store, **kwargs):
+    source = event.source
+    if getattr(source.platform, "value", "") != "mattermost":
+        return {"action": "allow"}
+    if not source.thread_id:
+        return {"action": "allow"}
+
+    chat_type = source.chat_type or "channel"
+    platform = source.platform.value
+    chat_id = source.chat_id
+
+    thread_key = f"agent:main:{platform}:{chat_type}:{chat_id}:{source.thread_id}"
+    parent_key = f"agent:main:{platform}:{chat_type}:{chat_id}"
+
+    if thread_key in gateway._session_model_overrides:
+        return {"action": "allow"}  # 已有独立 override，不覆盖
+
+    parent_override = gateway._session_model_overrides.get(parent_key)
+    if parent_override:
+        gateway._session_model_overrides[thread_key] = dict(parent_override)
+        logger.info("Model inherited: thread=%s ← channel=%s model=%s",
+                    thread_key, parent_key,
+                    parent_override.get("model", "?"))
+
+    return {"action": "allow"}
+```
+
 ### 会话重置流程
 
 ```
@@ -344,6 +401,47 @@ docker exec mm-postgres psql -U mmuser -d mattermost -c \
 
 **影响范围**：所有动态生成 action_id 的场景（如 clarify 卡片每个选项按钮的 id）。固定 id（如 `cmdmodelselect`、`cmdnewconfirm`）不受影响。
 
+### Pitfall 48：asyncio 并发回调竞态 — 双击审批按钮导致重复处理
+
+**症状**：用户快速点击审批按钮（Allow Once/Allow Session 等），有时看到「⚠️ 此审批已处理」错误，或者按钮卡住无反馈。
+
+**根因**：`asyncio.start_server` 为每个 TCP 连接创建独立协程。用户快速双击时，两个 HTTP 请求**同时**进入 `_handle_callback`，都通过了 `count == 0` 检查（因为第一个还没完成 `resolve_gateway_approval`），导致竞态。虽然已有的 `count == 0` 兜底会在第一个完成后拦截第二个，但用户体验差——看到错误提示而非正常的处理反馈。
+
+**修复**：按 `session_key` 使用 `asyncio.Lock` 串行化审批处理（`adapter.py` lines 504-576）：
+
+```python
+import asyncio as _asyncio
+
+if not hasattr(self, "_approval_locks"):
+    self._approval_locks: Dict[str, _asyncio.Lock] = {}
+
+lock = self._approval_locks.get(session_key)
+if not lock:
+    lock = _asyncio.Lock()
+    self._approval_locks[session_key] = lock
+
+if lock.locked():
+    # 并发请求 — 另一个回调正在处理同一审批，快速返回
+    return {
+        "update": {
+            "message": "⏳ 正在处理您的审批请求，请稍候...",
+            "props": {"attachments": [{"actions": []}]},
+        },
+    }
+
+async with lock:
+    count = resolve_gateway_approval(session_key, choice)
+    # ... 正常处理 ...
+```
+
+**关键设计点**：
+1. `lock.locked()` 检查与 `async with lock` 之间没有 `await` 点，在 asyncio 单线程模型下是原子的，无竞态窗口
+2. 并发请求返回即时 `update` + 清空 `actions` → 按钮消失，用户不会再点第三次
+3. 第一个请求正常完成 → 返回最终结果（Approved/Denied）
+4. 已有的 `count == 0` 兜底保留为最后防线
+
+**触发场景**：任何 Interactive Message 按钮如果处理时间较长（网络延迟、`resolve_gateway_approval` 内部锁竞争等），都可能触发此问题。审批按钮是最常见的触发入口。
+
 ## 卡片更新机制与消息重复
 
 ### Interactive Message update 响应格式
@@ -459,10 +557,11 @@ def _make_select(action_id, name, options, context, callback_url):
 ```
 
 选项格式：
-- 完整 provider/model 格式：`zenmux/minimax-m2.7`
-- 当前模型标记 ★ 前缀：`★ zenmux/minimax-m2.7`
-- `name` 字段作为 placeholder（未展开时的显示文本）：`"当前: zenmux/minimax-m2.7"`
-- 按 provider 排列，同一 provider 的模型连续
+- 显示 `[ProviderName] model-name`（如 `[zenmux] deepseek-v4-pro`），provider 名称来自 `custom_providers.<name>` 字段
+- 当前模型标记 ★ 前缀：`★ [zenmux] deepseek-v4-pro`
+- 选项 `value` 仍为完整 `model_id`（如 `zenmux/deepseek-v4-pro`），回调兼容性不变
+- `name` 字段作为 placeholder（未展开时的显示文本）：`"当前: zenmux/deepseek-v4-pro"`
+- 按 provider 排列，同一 provider 的模型连续；多 provider 同名模型通过 `[Provider]` 前缀明确区分
 
 **优势**：1 个 attachment + 1 个 action，不再受 5 按钮限制；UI 更整洁。
 

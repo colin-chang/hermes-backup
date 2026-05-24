@@ -65,6 +65,7 @@ _patch_registry=(
     "gateway/platforms/mattermost.py|Thread 里长时间任务的进度消息跑到频道去了|_raw_root = post.get"
     "gateway/run.py|Clarify 问题等待回复时用户回复被当成新会话（Session 分裂，Agent 答非所问）|_canonical_entry = self.session_store.get_or_create_session"
     "gateway/run.py|Clarify concurrency guard: 防止 clarify 阻塞期间新消息创建重复 Session|Gateway intercepted clarify at session guard"
+    "gateway/stream_consumer.py|回复碎成很多条消息：Agent 评论文字和正文被拆成多条独立消息|Accumulate commentary"
     )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -575,6 +576,38 @@ new += "        self._cache_session_source(session_key, source)"
 
 if old in content:
     content = content.replace(old, new, 1)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── P50: 评论→正文合并 ────────────────────────────────────────────────
+    _do_patch "gateway/stream_consumer.py" \
+        "回复碎成很多条消息：Agent 评论文字和正文被拆成多条独立消息" \
+        'Accumulate commentary' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, "r") as f:
+    content = f.read()
+
+old = """                if commentary_text is not None:
+                    self._reset_segment_state()
+                    await self._send_commentary(commentary_text)
+                    self._last_edit_time = time.monotonic()
+                    self._reset_segment_state()"""
+
+new = """                if commentary_text is not None:
+                    # Accumulate commentary into the stream buffer instead of
+                    # sending as a separate message.  Prevents response fragmentation
+                    # across multiple messages on platforms like Mattermost.
+                    if self._accumulated:
+                        self._accumulated += "\\n\\n"
+                    self._accumulated += commentary_text"""
+
+if old in content:
+    content = content.replace(old, new)
     with open(file_path, "w") as f:
         f.write(content)
     print("APPLIED")

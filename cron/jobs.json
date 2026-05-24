@@ -20,15 +20,15 @@
       "schedule_display": "0 2 * * *",
       "repeat": {
         "times": null,
-        "completed": 12
+        "completed": 13
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:26:59.754948+08:00",
-      "next_run_at": "2026-05-24T02:00:00+08:00",
-      "last_run_at": "2026-05-23T02:00:40.698863+08:00",
+      "next_run_at": "2026-05-25T02:00:00+08:00",
+      "last_run_at": "2026-05-24T02:00:12.013702+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -64,15 +64,15 @@
       "schedule_display": "0 17 * * *",
       "repeat": {
         "times": null,
-        "completed": 17
+        "completed": 18
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:30:30.666366+08:00",
-      "next_run_at": "2026-05-23T17:00:00+08:00",
-      "last_run_at": "2026-05-22T20:00:46.692784+08:00",
+      "next_run_at": "2026-05-24T17:00:00+08:00",
+      "last_run_at": "2026-05-23T17:06:15.370574+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,15 +109,15 @@
       "schedule_display": "0 3 * * 0",
       "repeat": {
         "times": null,
-        "completed": 3
+        "completed": 4
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-17T01:04:16.155230+08:00",
-      "next_run_at": "2026-05-24T03:00:00+08:00",
-      "last_run_at": "2026-05-18T23:17:53.016997+08:00",
+      "next_run_at": "2026-05-31T03:00:00+08:00",
+      "last_run_at": "2026-05-24T03:00:26.544686+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -129,5 +129,5 @@
       "toast_notifications": true
     }
   ],
-  "updated_at": "2026-05-23T02:00:40.699513+08:00"
+  "updated_at": "2026-05-24T03:00:26.545233+08:00"
 }
