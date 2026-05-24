@@ -141,6 +141,9 @@ skills/creative/touchdesigner-mcp/
 #   role-content-ops, role-investment-advisor, role-parenting-expert,
 #   role-tech-advisor, tool-selection-strategy
 
+# ── 独立仓库（已分流至独立 GitHub 仓库） ──────────────────────────────────────
+skills/custom/image2webp-skill/
+
 # ── 浏览器调试 ──────────────────────────────────────────────────────────────
 chrome-debug/
 
