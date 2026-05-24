@@ -35,6 +35,28 @@
 
 ## 技术决策记录
 
+### Mattermost MAX_POST_LENGTH 截断问题（2026-05-25）
+- `gateway/platforms/mattermost.py` 硬编码 `MAX_POST_LENGTH = 4000`（OpenClaw 遗留）
+- 长消息被 `truncate_message()` 拆分后 CRT Thread 折叠 → 用户只看到第一段
+- Mattermost 实际支持 16383 字符
+- **已修复**：`MAX_POST_LENGTH = int(os.getenv("MATTERMOST_MAX_POST_LENGTH", "16000"))`
+- `.env` 需手动添加：`MATTERMOST_MAX_POST_LENGTH=16000`
+- 已注册为 `hermes-patches.sh` P51，`hermes update` 后 `hermes-patches.sh apply` 可恢复
+- 完整分析：`mattermost-operations` Skill → `references/mattermost-message-truncation.md`
+
+### Mattermost iPad 端表格压缩 CSS 根因（2026-05-25）
+- `.table-responsive` 缺 `overflow-x: auto`（仅 `direction: ltr`）→ 空壳
+- `.post-message` 的 `overflow: clip` 在 iOS Safari 更激进
+- `table-layout: fixed` + HTML `<table>` 的 `max-width: 100%` → 向内压缩
+- 展开独立页面正常是因为脱离 post 容器链
+- 完整分析：`mattermost-operations` Skill → `references/ipad-table-rendering.md`
+
+### 源码修改工作流（2026-05-25 用户明确要求）
+- **先汇报再动手**：涉及源码直接修改时，先出示完整的根因报告和修复方案供审阅
+- 用户明确说"先不要改，先给我原因和报告供我审阅，我同意之后再去修改代码"
+- 必须等用户确认方案后再执行修改，不可直接 `patch` 源码文件
+- 涉及 Hermes 官方代码的修改必须注册到 `hermes-patches.sh`（防止 `hermes update` 覆盖）
+
 ### Ollama 本地模型性能调优（2026-05-19）
 - M2 Pro + 32GB 实测：上下文长度是 Apple Silicon 上 prefill 的头号瓶颈
 - qwen3.5 默认 262K context → prefill 仅 4 tok/s，限制到 16K → 53 tok/s（13x 提升）
@@ -92,8 +114,7 @@
 - 不支持：表格、标题 H1-H6、有序/无序列表、LaTeX、HTML 标签
 - 不适合作为 AI Agent 长内容输出平台
 
-
-## 配置细节
+### Telegram MarkdownV2 局限性
 
 ### Web UI 用户反馈偏好（2026-05-24）
 - **通知消息用居中模态弹窗**，不要用角落 toast

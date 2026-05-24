@@ -80,6 +80,22 @@ git remote add origin git@github.com:user/RepoName.git
 git push -u origin main
 ```
 
+### 7. GitHub Actions 自动发布
+
+添加 `.github/workflows/release.yml`，通过 `workflow_dispatch` 触发自动发布：更新版本号 → 提交 → 打 tag → 推送 → 创建 GitHub Release。
+
+```bash
+# 触发发布
+gh workflow run release.yml -F version=v1.0.0
+```
+
+> 完整模板 + 常见陷阱见 `references/github-release-workflow.md`。
+
+**关键要点**：
+- `git tag -af`（不是 `-a`）— 幂等，避免 tag 已存在时报错
+- "Commit version bump" 步骤用 `&& echo || commit` 代替 `|| commit` — 避免无变更时 exit 1
+- 用 `softprops/action-gh-release@v2` 创建 GitHub Release，自动生成 Release Notes
+
 ## 常见陷阱
 
 ### 1. 密钥文件是目录而非文件
@@ -101,3 +117,4 @@ git push -u origin main
 ## 参考文件
 
 - `references/checklist-template.md` — 可复制的合规检查清单模板
+- `references/github-release-workflow.md` — GitHub Actions 自动发布工作流模板 + 常见陷阱

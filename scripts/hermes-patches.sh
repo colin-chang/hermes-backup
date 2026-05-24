@@ -66,7 +66,7 @@ _patch_registry=(
     "gateway/run.py|Clarify 问题等待回复时用户回复被当成新会话（Session 分裂，Agent 答非所问）|_canonical_entry = self.session_store.get_or_create_session"
     "gateway/run.py|Clarify concurrency guard: 防止 clarify 阻塞期间新消息创建重复 Session|Gateway intercepted clarify at session guard"
     "gateway/stream_consumer.py|回复碎成很多条消息：Agent 评论文字和正文被拆成多条独立消息|Accumulate commentary"
-    )
+)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 辅助函数

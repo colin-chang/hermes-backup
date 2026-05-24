@@ -9,7 +9,7 @@
 ## 架构
 
 ```
-Hermes / Agent → proxy.py (FastAPI :8899) → liteLLM SDK → Vertex AI Gemini
+Hermes / Agent → proxy.py (FastAPI :8897) → liteLLM SDK → Vertex AI Gemini
                       │
                       ├─ store.py (双模式计费 + 统计)
                       ├─ static/index.html  (仪表盘: 概览/统计/历史)
@@ -25,7 +25,7 @@ docker compose up -d   # 本地
 conda activate vertex-monitor && python proxy.py
 ```
 
-Docker: `python:3.11-slim` → 端口 8899，数据卷 `./data/`，GitHub 暗色主题 Web UI。
+Docker: `python:3.11-slim` → 端口 8897，数据卷 `./data/`，GitHub 暗色主题 Web UI。
 
 ## 计费模型
 
@@ -212,7 +212,7 @@ static/index.html  static/settings.html  static/i18n.js
 ```yaml
 custom_providers:
   - name: vertex-budget
-    base_url: http://localhost:8899/v1
+    base_url: http://localhost:8897/v1
     api_key: noop
     model: gemini-3.1-flash-lite
     models:

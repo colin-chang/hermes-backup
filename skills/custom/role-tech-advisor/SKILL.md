@@ -36,6 +36,7 @@ metadata:
 - Hermes 多平台选型与渲染优化（平台对比矩阵见 `references/hermes-platform-comparison.md`）
 - 本地模型部署与性能调优（Ollama 优化指南见 `references/ollama-performance-tuning.md`）
 - Mattermost Docker 部署与推送通知配置（见 `references/mattermost-docker-push-notifications.md`）
+- Mattermost Webapp Markdown 表格渲染管线与 iPad 端兼容性问题（见 `references/mattermost-table-rendering-architecture.md`）
 - 模型白名单跨项目修复模式：hermes-agent + hermes-webui 同根问题独立修复（见 `references/models-whitelist-fix-pattern.md`）
 - liteLLM 预算代理模式：轻量计费中间层 + 优惠券系统 + Docker 部署（见 `references/litellm-budget-proxy-pattern.md`）
 - 全球 AI 前沿动态、开源项目、行业趋势 7×24 跟踪

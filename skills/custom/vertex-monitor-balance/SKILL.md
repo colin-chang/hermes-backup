@@ -20,7 +20,7 @@ triggers:
 ## 查询端点
 
 ```
-GET http://localhost:8899/api/config
+GET http://localhost:8897/api/config
 ```
 
 ## 执行方式
@@ -28,7 +28,7 @@ GET http://localhost:8899/api/config
 始终使用终端工具执行 `curl` 查询（容器在本地运行）：
 
 ```bash
-curl -s http://localhost:8899/api/config 2>/dev/null || echo '{"error":"container_not_running"}'
+curl -s http://localhost:8897/api/config 2>/dev/null || echo '{"error":"container_not_running"}'
 ```
 
 ## 响应解析
@@ -77,7 +77,7 @@ Vertex 预算状态：{status emoji/text}
 如果只需要验证 Vertex AI 连接是否正常（不关心余额），调用 `/api/test` 端点：
 
 ```bash
-curl -s -X POST http://localhost:8899/api/test
+curl -s -X POST http://localhost:8897/api/test
 ```
 
 响应示例：
@@ -90,7 +90,7 @@ curl -s -X POST http://localhost:8899/api/test
 | 错误 | 原因 | 处理 |
 |------|------|------|
 | `error: container_not_running` | Docker 容器未启动 | 告知用户运行 `cd ~/Developer/Services/VertexMonitor && docker compose up -d` |
-| 连接拒绝 | 端口 8899 不可达 | 同上 |
+| 连接拒绝 | 端口 8897 不可达 | 同上 |
 | HTTP 非 200 | 代理异常 | 显示原始错误信息 |
 | 余额/配置在重启后丢失 | 数据未写入 volume 挂载目录 | 详见 `references/docker-data-persistence.md` — 检查 `data/store.json` 是否存在 |
 
@@ -149,7 +149,7 @@ input, textarea, select:not(.lang-select) { width: 100%; font-size: 14px; }
 
 **执行：**
 ```bash
-curl -s http://localhost:8899/api/config
+curl -s http://localhost:8897/api/config
 ```
 
 **回复：**

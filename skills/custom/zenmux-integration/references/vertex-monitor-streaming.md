@@ -2,7 +2,7 @@
 
 ## 症状
 
-Hermes 使用 `custom:vertex` provider（指向 `http://localhost:8899/v1`）时：
+Hermes 使用 `custom:vertex` provider（指向 `http://localhost:8897/v1`）时：
 - agent.log 显示 `Empty response (no content or reasoning)` 连续 3 次重试
 - 然后 fallback 到备用 provider（Ollama），若备用也挂则完全失败
 - TCP 连接正常关闭（`tcp_force_closed=0`），HTTP 状态码 200
@@ -51,7 +51,7 @@ data: [DONE]
 
 当 Hermes 出现 "Empty response" 错误时：
 
-1. **确认代理存活**：`curl http://localhost:8899/health`
+1. **确认代理存活**：`curl http://localhost:8897/health`
 2. **非流式直连测试**：`curl ... -d '{"stream":false,...}' → 验证代理本身正常`
 3. **流式直连测试**：`curl -N ... -d '{"stream":true,...}' → 检查是否返回 SSE 格式`
 4. **检查 agent.log**：`grep "Empty response" errors.log` → 确认是流式解析问题
