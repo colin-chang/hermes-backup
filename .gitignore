@@ -36,7 +36,7 @@ state-snapshots/
 
 # Gateway
 gateway/
-gateway.*
+gateway*
 channel_directory.json
 discord_threads.json
 
