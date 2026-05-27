@@ -13,7 +13,7 @@ created: 2026-05-17
 - **脚本路径**: `~/.hermes/scripts/hermes-weekly-cleanup.sh`
 - **调度**: `0 3 * * 0`（每周日凌晨 3:00 CST）
 - **模式**: `no_agent=true`（纯脚本执行，无 LLM 开销）
-- **推送目标**: `deliver: "discord"` → Discord Home 频道
+- **推送目标**: `deliver: "mattermost:xsdt56rfjt8x3c9nzzjou3wayo"` → Mattermost Home 频道
 
 > **设计模式参考：** 此任务是 `no_agent=true` 模式的参考实现。
 > 通用决策框架、`report()` 函数模板、迁移清单 → `hermes-agent` skill → `references/cron-no-agent-pattern.md`

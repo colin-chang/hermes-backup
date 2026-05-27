@@ -1,7 +1,7 @@
 # Hermes Scripts 目录索引
 
 > 路径：`~/.hermes/scripts/`
-> 更新时间：2026-05-21
+> 更新时间：2026-05-28
 
 ---
 
@@ -22,14 +22,22 @@
 
 **作用：** 当 `hermes-agent` 上游版本更新后，本地修改会被覆盖。此脚本一键还原所有自定义 patch。
 
-**补丁覆盖范围（当前 14 个补丁）：**
-- 自定义 provider (`custom:*`) 聚合器识别 + 假阳性修复
-- `config.yaml` 模型白名单优先于线上 `/v1/models` 拉取
-- Gateway 配置桥接修复（`gateway_restart_notification`）
-- Cron Job 中文存储修复
-- DM 审批传参 + 工具进度 Thread 路由
-- YAML 中文写入修复
-- MEDIA 正则收紧（防误匹配非文件路径）
+**活跃补丁（当前 7 个）：**
+
+| # | 文件 | 作用 |
+|---|------|------|
+| 1 | `providers.py` | 自定义 provider 聚合器识别 — `custom:*` 只显示精选模型 |
+| 2 | `doctor.py` | `hermes doctor` 误报修复 — 自定义 provider 不再弹「模型不匹配」假警告 |
+| 3 | `model_switch.py` | 模型白名单优先（generic） — config 设了 `models` 限制就真生效 |
+| 4 | `model_switch.py` | 模型白名单优先（custom_providers） — 同上，`custom_providers` 分组也遵守 |
+| 5 | `cron/jobs.py` | 定时任务中文存储修复 — `ensure_ascii=False` 防止汉字变 `\uXXXX` |
+| 6 | `stream_consumer.py` | 评论合并 + 幽灵围栏 — Agent 评论文字不再被拆成多条独立消息 |
+| 7 | `base.py` | 幽灵代码围栏空块 — 长代码跨 chunk 分片不再产生空围栏块 |
+
+**已消除（无需再打）：**
+- `gateway/config.py`、`utils.py`、MEDIA 正则 — ✅ 上游合入
+- 工具进度 Thread 路由、session 串台 — ✅ 迁移至 `run-patches.sh` 插件
+- Mattermost 6 个 Patch — ✅ 迁移至 `mattermost-enhancer` 插件
 
 **何时运行：**
 - `hermes-agent` 升级后（`git pull` 或 `pip install --upgrade`）
