@@ -51,6 +51,7 @@
 - 修改源码后必须同步更新对应 patch 脚本（`hermes-patches.sh` 或 `hermes-mattermost-enhancer.sh`）
 - 注册表、`_do_patch` 检查模式、header 注释三者必须一致
 - 修复完成后用 `check` 命令验证全部通过
+- ⚠️ **验证上游合入时必须以 `origin/main` 为基准**（`git show origin/main:<file>`），不是 `HEAD` 或本地副本。本地 check 通过仅表示本机已打过 patch，不代表上游已修复。详见 `hermes-config-management` → ` references/hermes-patches-upstream-check.md`
 
 ### Mattermost MAX_POST_LENGTH 截断问题（2026-05-25）
 - `gateway/platforms/mattermost.py` 硬编码 `MAX_POST_LENGTH = 4000`（OpenClaw 遗留）

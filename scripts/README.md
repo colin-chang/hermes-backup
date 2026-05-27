@@ -22,7 +22,7 @@
 
 **作用：** 当 `hermes-agent` 上游版本更新后，本地修改会被覆盖。此脚本一键还原所有自定义 patch。
 
-**活跃补丁（当前 7 个）：**
+**活跃补丁（当前 8 个）：**
 
 | # | 文件 | 作用 |
 |---|------|------|
@@ -31,13 +31,15 @@
 | 3 | `model_switch.py` | 模型白名单优先（generic） — config 设了 `models` 限制就真生效 |
 | 4 | `model_switch.py` | 模型白名单优先（custom_providers） — 同上，`custom_providers` 分组也遵守 |
 | 5 | `cron/jobs.py` | 定时任务中文存储修复 — `ensure_ascii=False` 防止汉字变 `\uXXXX` |
-| 6 | `stream_consumer.py` | 评论合并 + 幽灵围栏 — Agent 评论文字不再被拆成多条独立消息 |
+| 6 | `stream_consumer.py` | 评论合并 — Agent 评论文字不再被拆成多条独立消息 |
 | 7 | `base.py` | 幽灵代码围栏空块 — 长代码跨 chunk 分片不再产生空围栏块 |
+| 8 | `stream_consumer.py` | fallback send Thread 路由 — 修复「fallback 发送时回复跑到主频道」 |
 
 **已消除（无需再打）：**
 - `gateway/config.py`、`utils.py`、MEDIA 正则 — ✅ 上游合入
-- 工具进度 Thread 路由、session 串台 — ✅ 迁移至 `run-patches.sh` 插件
-- Mattermost 6 个 Patch — ✅ 迁移至 `mattermost-enhancer` 插件
+- Mattermost 专属修复（6 个）→ 迁移至 `mattermost-enhancer` 插件脚本
+
+**最后验证：** 2026-05-28，Hermes v2026.5.16-1195-g458a94e42
 
 **何时运行：**
 - `hermes-agent` 升级后（`git pull` 或 `pip install --upgrade`）

@@ -7,36 +7,28 @@
 #   当 hermes-agent 上游版本更新后，本地修改会被覆盖，
 #   此脚本用于一键还原以下 patch。
 #
-#   1.  hermes_cli/providers.py           — 自定义 provider (custom:*) 聚合器识别
-#   2.  hermes_cli/doctor.py              — 自定义 provider vendor-prefix 假阳性修复
-#   3.  hermes_cli/model_switch.py        — config 白名单优先于线上拉取
-#  ❌ 4.  gateway/config.py                 — ✅ 上游已合入（v2026.5.16 之后）
-#   5.  cron/jobs.py                      — Cron job 中文存储修复
-#  ❌ 6-11. gateway/*.py                  — 已迁移到 mattermost-enhancer 插件
-#  ❌ 12. utils.py                         — ✅ 上游已合入（yaml_rt.allow_unicode = True）
-#  ❌ 13. MEDIA 正则收紧                   — ✅ 上游已合入（TOOL_MEDIA_RE + extract_media）
-#  P50. gateway/stream_consumer.py        — 评论→正文合并，防止消息碎片化
-#  P53. gateway/platforms/base.py         — truncate_message 幽灵代码围栏修复
-#  ❌ P55. gateway/stream_consumer.py      — ✅ 上游已合入（_send_fallback_final 已传 reply_to）
-#  ❌ P57. gateway/run.py                  — 工具进度进 Thread → 已迁移至插件 run-patches.sh
-#  ❌ P58. gateway/run.py                  — session 串台修复 → 已迁移至插件 run-patches.sh
-#  ❌ P54/P56 — 已迁移到 mattermost-enhancer 插件
+#   活跃 patch（当前 8 个）：
+#     1.  hermes_cli/providers.py           — 自定义 provider (custom:*) 聚合器识别
+#     2.  hermes_cli/doctor.py              — 自定义 provider vendor-prefix 假阳性修复
+#     3.  hermes_cli/model_switch.py        — config 白名单优先于线上拉取（user providers）
+#     4.  hermes_cli/model_switch.py        — 同上（custom_providers）
+#     5.  cron/jobs.py                      — Cron job 中文存储修复
+#     6.  gateway/stream_consumer.py        — P50: 评论→正文合并，防止消息碎片化
+#     7.  gateway/platforms/base.py         — P53: truncate_message 幽灵代码围栏修复
+#     8.  gateway/stream_consumer.py        — P55: fallback send 保留 Thread 路由
 #
-#  活 patch（仍需手动打）：
-#    • providers.py — custom: aggregator
-#    • doctor.py — custom: vendor-prefix 假警告
-#    • model_switch.py — models 白名单优先
-#    • cron/jobs.py — ensure_ascii=False
-#    • stream_consumer.py — 评论合并 (P50) + 幽灵围栏 (P53)
+#   已消除（上游已合入或不再需要）：
+#     ✅ gateway/config.py             — 上游已合入（gateway_restart_notification）
+#     ✅ utils.py                      — 上游已合入（yaml_rt.allow_unicode = True）
+#     ✅ MEDIA 正则收紧                 — 上游代码重构，不再需要单独 patch
+#     ⚠️  Mattermost 专属修复           — 已迁移至 mattermost-enhancer 插件脚本
+#        （DM 审批 user_id / 工具进度 Thread 路由 / Clarify Session 分裂 /
+#         Clarify 并发守护 / Session 串台去重 / 批量图片 Thread 路由）
 #
-#  已消除：
-#    • gateway/config.py (4a/4b) — ✅ 上游合入
-#    • utils.py — ✅ 上游合入 (yaml_rt.allow_unicode)
-#    • MEDIA 正则 (10a/10b) — ✅ 上游合入
-#    • stream fallback reply_to (P55) — ✅ 上游合入
-#    • 工具进度进 Thread (P57) — ✅ 迁移至插件 run-patches.sh
-#    • session 串台修复 (P58) — ✅ 迁移至插件 run-patches.sh
-#    • Mattermost 6 个 Patch — ✅ 迁移到 mattermost-enhancer 插件
+#   版本感知：
+#     最后验证: 2026-05-28
+#     Hermes 版本: v2026.5.16-1195-g458a94e42
+#     验证方式: git show origin/main:<file> | grep "<check_pattern>"
 #
 # 使用方法：
 #   ./hermes-patches.sh check   # 检查当前状态（默认）
@@ -64,16 +56,18 @@ error()  { echo -e "${RED}[ERROR]${NC} $1"; }
 # ═══════════════════════════════════════════════════════════════════════════
 # Patch 注册表 — 单一数据源，apply 和 status 共用
 # 格式: "file_rel_path | label | check_grep_pattern"
+#   ML: 前缀 → 跨行匹配（python3 re.search）
 # ═══════════════════════════════════════════════════════════════════════════
 
 _patch_registry=(
     "hermes_cli/providers.py|Fix: custom: provider aggregator（修复「自定义 provider 显示全部模型」的问题）|startswith.*\"custom:\""
     "hermes_cli/doctor.py|Fix: custom: provider false warnings（修复「hermes doctor 误报模型不匹配」的问题）|startswith.*\"custom:\""
     "hermes_cli/model_switch.py|Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）|and not models_list"
-    "hermes_cli/model_switch.py|Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）|bool.*api_key.*and not grp\[\"models\"\]"
+    "hermes_cli/model_switch.py|Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）|bool.*api_key.*and not grp\\[\"models\"\\]"
     "cron/jobs.py|Fix: Chinese text garbled in cron jobs（修复「定时任务中文变乱码」的问题）|ensure_ascii=False"
     "gateway/stream_consumer.py|Fix: commentary fragmentation（修复「回复碎成很多条消息」的问题）|Accumulate commentary"
     "gateway/platforms/base.py|Fix: ghost fence in long code blocks（修复「长代码块出现幽灵空围栏」的问题）|reopening the fence would create"
+    "gateway/stream_consumer.py|Fix: fallback send loses thread routing（修复「fallback 发送时 Thread 路由丢失」的问题）|ML:content=chunk,\n.*reply_to=self._initial_reply_to_id"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -92,7 +86,20 @@ _do_patch() {
         error "$1 not found, skipped（文件不存在，已跳过）"
         return 1
     fi
-    if grep -q "$check" "$file" 2>/dev/null; then
+
+    # ML: prefix → multiline check via python3
+    if [[ "$check" == ML:* ]]; then
+        local ml_pattern="${check#ML:}"
+        if python3 -c "
+import sys, re
+with open('$file') as f:
+    content = f.read()
+sys.exit(0 if re.search('$ml_pattern', content) else 1)
+" 2>/dev/null; then
+            ok "$label — already applied, skipping（已经好了，跳过）"
+            return 0
+        fi
+    elif grep -q "$check" "$file" 2>/dev/null; then
         ok "$label — already applied, skipping（已经好了，跳过）"
         return 0
     fi
@@ -279,7 +286,7 @@ else:
     print("SKIP")
 PYEOF
 
-    # ── P50: 评论→正文合并 ────────────────────────────────────────────────
+    # ── 6. P50: 评论→正文合并 ────────────────────────────────────────────────
     _do_patch "gateway/stream_consumer.py" \
         "Fix: commentary fragmentation（修复「回复碎成很多条消息」的问题）" \
         'Accumulate commentary' <<'PYEOF'
@@ -311,7 +318,7 @@ else:
     print("SKIP")
 PYEOF
 
-    # ── P53: truncate_message 幽灵代码围栏 ─────────────────────────────────
+    # ── 7. P53: truncate_message 幽灵代码围栏 ─────────────────────────────────
     _do_patch "gateway/platforms/base.py" \
         "Fix: ghost fence in long code blocks（修复「长代码块出现幽灵空围栏」的问题）" \
         'reopening the fence would create' <<'PYEOF'
@@ -363,6 +370,45 @@ else:
     print("SKIP")
 PYEOF
 
+    # ── 8. P55: fallback send 保留 Thread 路由 ────────────────────────────
+    _do_patch "gateway/stream_consumer.py" \
+        "Fix: fallback send loses thread routing（修复「fallback 发送时 Thread 路由丢失」的问题）" \
+        'ML:content=chunk,\n.*reply_to=self._initial_reply_to_id' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+# The fallback send path in _send_fallback_final sends chunks without
+# reply_to, so messages can land in the main channel instead of the Thread.
+old = '''                result = await self.adapter.send(
+                    chat_id=self.chat_id,
+                    content=chunk,
+                    metadata=self.metadata,
+                )
+                if result.success:
+                    break
+                if attempt == 0 and self._is_flood_error(result):'''
+
+new = '''                result = await self.adapter.send(
+                    chat_id=self.chat_id,
+                    content=chunk,
+                    reply_to=self._initial_reply_to_id,
+                    metadata=self.metadata,
+                )
+                if result.success:
+                    break
+                if attempt == 0 and self._is_flood_error(result):'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -386,7 +432,21 @@ show_status() {
 
         total=$((total + 1))
         if [[ -f "$file" ]]; then
-            if grep -q "$check" "$file" 2>/dev/null; then
+            local matched=false
+            if [[ "$check" == ML:* ]]; then
+                local ml_pattern="${check#ML:}"
+                if python3 -c "
+import sys, re
+with open('$file') as f:
+    content = f.read()
+sys.exit(0 if re.search('$ml_pattern', content) else 1)
+" 2>/dev/null; then
+                    matched=true
+                fi
+            elif grep -q "$check" "$file" 2>/dev/null; then
+                matched=true
+            fi
+            if $matched; then
                 ok "$label"
                 applied=$((applied + 1))
             else
