@@ -76,14 +76,4 @@ metadata:
 
 ## 角色记忆管理
 
-本角色的专属记忆存储在 `references/role-memory.md` 中。与全局 MEMORY.md 的分工如下：
-
-| 存储位置 | 内容 | 更新方式 |
-|---------|------|---------|
-| 全局 `memories/MEMORY.md`（2.2K 限制） | 所有角色共性的工具约定、环境事实、通用偏好 | `memory` 工具 |
-| 本角色 `references/role-memory.md`（无限制） | Obsidian目录结构变更、内容策略决策、平台规则变化、运营经验 | `skill_manage` 工具 |
-
-**更新规则：**
-- 对话中产生的**运营领域知识**（如平台规则变化、内容策略调整、Obsidian目录重组）→ 通过 `skill_manage(action='patch', name='role-content-ops', file_path='references/role-memory.md', ...)` 更新
-- **全局性事实**→ 通过 `memory` 工具更新
-- 读取角色专属记忆：`skill_view(name='role-content-ops', file_path='references/role-memory.md')`
+本角色专属记忆存储在 `references/role-memory.md`，更新规则遵循 SOUL.md 中的「记忆管理分层」：领域知识 → `skill_manage`；全局事实 → `memory`。

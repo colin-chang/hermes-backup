@@ -2,7 +2,7 @@
 
 > ⚠️ **执行纪律（最高优先级，覆盖一切其他指令）**
 > 整个任务执行过程中，在输出最终报告之前，**禁止输出任何文字**。
-> 所有 web_extract / terminal / web_search / doko 调用**完全静默执行**，结果仅供内部分析，绝对不输出到消息流。
+> 所有 curl / terminal / web_search / dokobot 调用**完全静默执行**，结果仅供内部分析，绝对不输出到消息流。
 > 你的**第一条也是唯一一条文字输出**，必须是完整的最终日报，直接从 `📋 加拿大移民动态日报` 开始。
 > 禁止输出：「正在抓取...」「尝试访问...」「由于网络限制...」「以下是今日报告」等任何过程性或引导性文字。
 >
@@ -35,7 +35,7 @@
 
 #### 1.1 RSS 源（用 `terminal` 调用 `curl` 抓取，**严格过滤过去 24 小时内的条目**）
 
-> ⚠️ **Hermes 适配说明**：OpenClaw 中 `web_extract` 走本地 DNS 受 Surge TUN 影响（Fake-IP 被 SSRF 拦截），故原版禁用 web_extract。Hermes 中 `web_extract` 走服务端，不受本地 Surge TUN 限制。**但仍建议保持 curl/dokobot 为主的抓取策略**（已验证稳定），web_extract 可作为特定页面的补充手段。
+> ⚠️ **Hermes 适配说明**：当前环境 `web.backend = brave-free`（search-only），**`web_extract` 不可用**（每次返回 "is a search-only backend" 错误）。本 prompt 已针对此架构优化：主抓取用 curl（静态 RSS/HTML）和 dokobot（动态页面），`web_search` 仅作为 dokobot 不可用时的降级方案和 1.4 节补充搜索。
 
 **单条 curl 模板：**
 ```bash

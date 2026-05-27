@@ -17,10 +17,6 @@
 - GitHub 就绪：14 文件清单，`.gitignore` 排除凭证/数据/缓存，`data/.gitkeep` 保目录
 - 前端模式详见 `references/frontend-dark-ui-patterns.md`
 
-### Google Sheets 指挥中心
-- Master Sheet ID: `10ujCdTHQZKcSxPpbpu3G8myMHUV2V13dhniGRTdK0wU`
-- 结构：Overview / Content / Finance
-
 ### Mattermost 统一插件 (mattermost-enhancer)\n- 状态：✅ 全部完成（12 源码补丁已迁入插件，mattermost.py 零修改）\n- 插件位置：`~/.hermes/plugins/mattermost-enhancer/`\n- GitHub：`colin-chang/hermes-plugin-mattermost-enhancer`\n- 涵盖能力：\n  - DM 审批（交互卡片 + 回调服务器 + asyncio.Lock 防竞态）\n  - /model 模型切换（select 下拉 + session override + pending_model_notes）\n  - Channel → Thread 模型继承（pre_gateway_dispatch hook）\n  - /new 会话重置（确认卡片）\n  - Clarify 交互卡片渲染（按钮选项 + 「其他」文本输入）\n  - Thread root_id 解析（覆写 send/send_typing/send_local_file/send_url_as_file）\n  - MEDIA 文件缺失静默跳过\n  - **Runtime Footer 内联合并**（v2.2.0，2026-05-24）：流式模式下 footer 不再独立发帖，\n    检测 ` · ` 分隔符 → 编辑上一条 Bot 消息 → 水平线+斜体脚注
 
 ### Obsidian 混合云站
@@ -34,6 +30,27 @@
 - Chrome CDP：bb-browser daemon 模式，9222端口
 
 ## 技术决策记录
+
+### Hermes v0.14.0 升级 — Mattermost 插件兼容性审计与修复（2026-05-27）
+- 升级触发 6 个问题（P1-P6）：2 阻断 + 3 中 + 1 低
+- **P1**: 插件 `register_platform` 覆盖 bundled plugin 时丢失 `apply_yaml_config_fn` → config.yaml 配置静默失效
+  - 修复：显式导入 bundled 的 `_apply_yaml_config` 并传入 `register_platform`
+  - 通用模式：覆盖 `register_platform` 时必须检查并携带所有 hooks（详见 `references/hermes-platform-plugin-override.md`）
+- **P2**: 脚本检查模式过期（上游已修复 Thread 进度路由）
+  - 修复：check 用兼容新旧格式的正则；apply 函数预检新格式并跳过
+- **P3**: MAX_POST_LENGTH=4000 过小 → 跳过（等待 P1/P2 验证后再处理）
+- **P4**: `truncate_message` 幽灵代码围栏 → 在 carry_lang 重新打开 fence 前检测剩余内容首行是否为 bare ` ``` `
+  - 已注册 `hermes-patches.sh` P53
+- **P5**: WebSocket 频繁重连（close 258=WSMsgType.CLOSED） → 心跳 30s→15s
+  - 已注册 `hermes-patches.sh` P54
+- **P6**: 时区误配 → 跳过（用户已在深圳确认 Asia/Shanghai 正确）
+- 修复后需执行 `hermes gateway restart` 才能生效
+- Patch 脚本同步更新：注册表 + header 注释 + 检查模式一致性
+
+### 源码修改工作流补充（2026-05-27）
+- 修改源码后必须同步更新对应 patch 脚本（`hermes-patches.sh` 或 `hermes-mattermost-enhancer.sh`）
+- 注册表、`_do_patch` 检查模式、header 注释三者必须一致
+- 修复完成后用 `check` 命令验证全部通过
 
 ### Mattermost MAX_POST_LENGTH 截断问题（2026-05-25）
 - `gateway/platforms/mattermost.py` 硬编码 `MAX_POST_LENGTH = 4000`（OpenClaw 遗留）
@@ -93,28 +110,12 @@
 - 不要手动启动 Chrome `--remote-debugging-port=9222` 模式
 - `chrome://inspect` 不是开启 CDP 服务，只是客户端发现界面
 
-## 消息平台替代评估
-
-### Mattermost Docker 部署（2026-05-19）
-- 项目路径：`/Users/Colin/Developer/Services/Mattermost`
-- 重启方式：`bash start.sh`（使用 `docker-compose.without-nginx.yml` 覆写）
-- 版本：Team Edition 11.7.0，镜像 `mattermost-team-edition:11.7.0`
-- 推送通知：使用 TPNS (`https://push-test.mattermost.com`)，日志 Warning 和移动端弹窗为假阳性，实际推送正常
-- 容器代理：已添加 `HTTP_PROXY=http://proxy.orb.internal:8305` 等环境变量
-- 详细参考：`references/mattermost-docker-push-notifications.md`
-
-### Discord → Mattermost 迁移评估
-- 时间：2026-05-18
-- 原因：Discord Markdown 渲染差 + Hermes 消息碎片化（2000字符溢出分片）
-- 候选方案对比详见：`hermes-agent` skill → `references/im-platform-comparison.md`
-- **Mattermost 为当前最接近理想的选择**：GFM 完整 Markdown（表格+标题+LaTeX）、16384字符上限（根治溢出）、全平台原生客户端（含 iPad）、Docker 自托管
-- 待决策：是否启动 Mattermost 本地部署验证
-
-### Telegram MarkdownV2 局限性
-- 不支持：表格、标题 H1-H6、有序/无序列表、LaTeX、HTML 标签
-- 不适合作为 AI Agent 长内容输出平台
-
-### Telegram MarkdownV2 局限性
+### 消息平台决策（已落地：Mattermost）
+- **2026-05-18 评估**：Discord/Telegram/Mattermost 三选一 → Mattermost 胜出（GFM 完整 Markdown + 16384 字符上限 + 全平台原生客户端）
+- **部署**：`/Users/Colin/Developer/Services/Mattermost`，`bash start.sh` 启动，Team Edition 11.7.0
+- **推送通知**：TPNS（`push-test.mattermost.com`），日志 Warning 和移动端弹窗为假阳性，实际推送正常
+- **容器代理**：已添加 `HTTP_PROXY=http://proxy.orb.internal:8305`
+- **Telegram**：不支持表格/标题/LaTeX，不适合 AI Agent 长内容输出
 
 ### Web UI 用户反馈偏好（2026-05-24）
 - **通知消息用居中模态弹窗**，不要用角落 toast
@@ -122,32 +123,13 @@
 - **日期用中文格式**（2026年6月30日），不用 `toLocaleString`
 - 所有弹窗支持：点击遮罩关闭 + ESC 关闭
 
-### liteLLM SDK 响应处理陷阱（2026-05-24）
-- `litellm.completion()` 返回 `ModelResponse` 对象，**不是 dict**
-- 取 `usage`/`choices` 前必须 `resp.model_dump()` 转 dict
-- `litellm.completion_cost()` 可直接接受 `ModelResponse`，无需转换
+### 常见陷阱速查
+- **Web UI 自动刷新覆盖用户输入** → 引入 `dirty` 标志，跳过脏表单的自动刷新
+- **FastAPI 容器部署** → 必须设 `host="0.0.0.0"`（环境变量 `HOST` 传入），`127.0.0.1` 容器内不可达
+- **liteLLM `completion()`** 返回 `ModelResponse` 对象，取 `usage`/`choices` 前须 `model_dump()` 转 dict
+- **Gemini 3.1 thinking tokens** → `max_tokens < 20` 可能返回 `content: null`（thinking 耗尽 token 预算），设 ≥ 50
 
-### Docker 容器网络绑定（2026-05-24）
-- FastAPI/uvicorn 默认 `host="127.0.0.1"` 在容器内只监听 loopback，宿主机端口映射无效
-- 容器化部署必须设 `host="0.0.0.0"`（通过环境变量 `HOST` 传入）
-- docker-compose 中设 `environment: - HOST=0.0.0.0`
-
-### Web UI 自动刷新覆盖用户输入（2026-05-24）
-- 场景：`setInterval` 定期刷新时，服务器状态会覆盖用户未保存的表单编辑（如 Tab 切换）
-- 方案：引入 `dirty` 标志
-  - 用户点击 Tab / 修改表单 → `dirty = true` → 显示警告提示
-  - 自动刷新到达 → 若 `dirty` 则跳过表单更新，仅刷新只读概览数字
-  - 保存成功后 → `dirty = false` → 恢复正常刷新
-- 适用于所有有自动刷新 + 表单编辑的 Web UI
-
-### Gemini 3.1 thinking tokens 截断（2026-05-24）
-- Gemini 3.1 系列模型在 `max_tokens` 极低（如 5-10）时可能返回 `content: null`
-- 原因：模型消耗 token 用于内部推理（thinking blocks），输出 token 不够
-- 解决：`max_tokens` 至少设 20+，推荐 50+
-
-### iMessage 发送（2026-05-19）
-- 始终加载 `nomad-imessage`（非 builtin `imessage`，后者 bridge 路径已失效）
-- 加载方式：`/skill nomad-imessage` 或自然语言触发
-- Bridge 脚本在 skill 内：`~/.hermes/skills/custom/nomad-imessage/references/imsg-bridge.command`
-- 发送前自动检测 bridge 运行状态（`tmux has-session`），未运行则 `open` + `sleep 2`
-- 禁止使用 `osascript send`（假阳性根因：永远返回 exit 0，已导致 4 次重复发送事故）
+### iMessage 发送
+- Bridge：`~/.hermes/skills/nomad-imessage/references/imsg-bridge.command`
+- 发送前检测 `tmux has-session`，未运行则 `open` + `sleep 2`
+- ⚠️ 禁止 `osascript send`（假阳性：永远返回 exit 0，已致 4 次重复发送）

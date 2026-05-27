@@ -6,7 +6,7 @@
 ## QMD 知识库配置
 - **QMD 版本：** 2.1.0
 - **MCP 服务器：** `qmd mcp`（已注册到 `~/.hermes/config.yaml`）
-- **知识库集合：** `knowledge-base` → `/Users/Colin/Developer/GitHub/KnowledgeBase`（97 个 .md 文件）
+- **知识库集合：** `knowledge-base` → `/Users/Colin/Developer/GitHub/KnowledgeBase`
 - **索引状态：** BM25 全文索引已完成；向量嵌入待生成（`qmd embed`）
 - **搜索命令：** `qmd query "..."` 混合搜索 | `qmd search "..."` BM25 | `qmd vsearch "..."` 向量
 

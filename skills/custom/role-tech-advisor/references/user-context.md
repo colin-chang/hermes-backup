@@ -31,5 +31,4 @@
 - 所有沟通和技术方案用中文
 
 ## 常用凭证获取
-- **HLJP Token（开发环境）：** `https://dev.xymind.cn`，User: `kkkkk`/`123456`
-- 通过 curl POST `/auth/connect/token` 获取 Bearer token
+<!-- HLJP Token 凭证详见 role-memory.md -->

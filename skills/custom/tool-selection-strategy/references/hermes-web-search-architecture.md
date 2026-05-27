@@ -35,3 +35,20 @@ web_search tool 调用
 | Provider 选择 | 启动时按 config/探测选 provider | ✅ 自动 |
 | 调用失败 | 返回 error JSON 给 LLM，不做 provider 切换 | ❌ 无自动 |
 | dokobot 降级 | LLM 收到 error 后，按 Skill 指令手动调用 `dokobot search/read` | ❌ Agent 手动 |
+
+## Per-Capability Config 设计
+
+Hermes 支持为 search / extract / crawl 分别指定不同的 provider：
+
+```yaml
+web:
+  search_backend: brave-free    # 搜索用免费
+  extract_backend: firecrawl    # 提取用付费
+  # web.backend 作为共享回退（以上均未设置时才生效）
+```
+
+**典型使用模式**：search 用免费的 brave-free/ddgs，extract 单独配一个付费 provider。这样只在实际需要提取全文时才产生 API 费用，搜索量再大也不花钱。
+
+**extract 降级链**：当未配置 `web.extract_backend` 且 `web.backend` 指向 search-only provider 时，`web_extract` 会精确报错 `"{name} is a search-only backend"`，LLM 收到后按本 Skill 降级到 `dokobot read --local`。这是设计行为——免费 search + dokobot 降级 ≈ 零成本 Web 提取。
+
+详见 `references/web-provider-ecosystem.md` — 全部 8 个 provider 的能力矩阵与配置场景，以及自建免费 Extract Provider 的成本收益评估。

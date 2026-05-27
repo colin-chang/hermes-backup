@@ -114,20 +114,59 @@ _patch_registry=(
 4. [ ] 运行 `./hermes-patches.sh check` 验证新增项显示 ✅
 5. [ ] 如果同一文件已有补丁，check_grep 不与已有项冲突
 
-## 当前补丁清单（2026-05-23）
+## 当前补丁清单（2026-05-29）
 
-| # | 文件 | 标签摘要 | check_grep |
-|---|------|---------|-----------|
-| 1 | `hermes_cli/providers.py` | 自定义 provider 聚合器识别 | `startswith.*"custom:"` |
-| 2 | `hermes_cli/doctor.py` | doctor 假阳性修复 | `startswith.*"custom:"` |
-| 3a | `hermes_cli/model_switch.py` | 模型白名单优先 | `and not models_list` |
-| 3b | `hermes_cli/model_switch.py` | custom_providers 白名单 | `if not grp\["models"\]` |
-| 4a | `gateway/config.py` | 重启通知桥接 | `"gateway_restart_notification" in platform_cfg` |
-| 4b | `gateway/config.py` | extra fallback 读取 | `extra.*gateway_restart_notification` |
-| 5 | `cron/jobs.py` | Cron 中文修复 | `ensure_ascii=False` |
-| 9 | `utils.py` | YAML 中文写入 | `allow_unicode=True` |
-| 10a | `gateway/run.py` | MEDIA 正则收紧 | `_TOOL_MEDIA_RE` |
-| 10b | `gateway/platforms/base.py` | MEDIA 兜底移除 | `|\\$))` |
-| 11/P38 | `gateway/platforms/mattermost.py` | Thread root_id fallback | `_raw_root = post.get` |
-| P46 | `gateway/run.py` | Clarify Session 分裂 | `_canonical_entry = self.session_store.get_or_create_session` |
-| P46b | `gateway/run.py` | Clarify concurrency guard | `Gateway intercepted clarify at session guard` |
+| # | 文件 | 标签摘要 | check_grep | 上游状态 |
+|---|------|---------|-----------|---------|
+| 1 | `hermes_cli/providers.py` | 自定义 provider 聚合器识别 | `startswith.*"custom:"` | 待提交 |
+| 2 | `hermes_cli/doctor.py` | doctor 假阳性修复 | `startswith.*"custom:"` | 待提交 |
+| 3a | `hermes_cli/model_switch.py` | 模型白名单优先 | `and not models_list` | 待提交 |
+| 3b | `hermes_cli/model_switch.py` | custom_providers 白名单 | `if not grp\["models"\]` | 待提交 |
+| 4a | `gateway/config.py` | 重启通知桥接 | `"gateway_restart_notification" in platform_cfg` | 待提交 |
+| 4b | `gateway/config.py` | extra fallback 读取 | `extra.*gateway_restart_notification` | 待提交 |
+| 5 | `cron/jobs.py` | Cron 中文修复 | `ensure_ascii=False` | 待提交 |
+| 9 | `utils.py` | YAML 中文写入 | `allow_unicode=True` | 待提交 |
+| 10a | `gateway/run.py` | MEDIA 正则收紧 | `_TOOL_MEDIA_RE` | 待提交 |
+| 10b | `gateway/platforms/base.py` | MEDIA 兜底移除 | `|\\$))` | 待提交 |
+| P50 | `gateway/stream_consumer.py` | 评论→正文合并 | `Accumulate commentary` | 待提交 |
+| P53 | `gateway/platforms/base.py` | 幽灵代码围栏 | `reopening the fence would create` | 待提交 |
+| P54 | `plugins/platforms/mattermost/adapter.py` | WebSocket 心跳 30→15s | `heartbeat=15.0` | 待提交 |
+| P55 | `gateway/stream_consumer.py` | stream fallback 缺 reply_to | `reply_to=self._initial_reply_to_id` | [PR #33335](https://github.com/NousResearch/hermes-agent/pull/33335) |
+| P56 | `plugins/platforms/mattermost/adapter.py` | _api_put 缺 timeout | `timeout=aiohttp.ClientTimeout(total=30)` | [PR #33335](https://github.com/NousResearch/hermes-agent/pull/33335) |
+| P57 | `gateway/run.py` | 工具进度消息不在Thread中：Mattermost不应要求source.thread_id | `or source.platform == Platform.MATTERMOST` | 待提交 |
+
+**注**：P38/P46/P46b 已迁入 `mattermost-enhancer` 插件或已合并，不再存在于 `hermes-patches.sh`。
+
+## Pitfall 6：上游"修复"不完整 — 删除本地 patch 前必须验证语义
+
+**血泪教训（P57）**：`hermes-mattermost-enhancer.sh` 的 Patch 2（progress→thread）在 commit `73439a4` 中被删除，理由是"Hermes v0.14.0 上游已修复"。但上游修复是不完整的：
+
+```python
+# 上游 v0.14.0（有 Bug — source.thread_id 在 Channel 根消息时为 None）
+_progress_reply_to = (
+    event_message_id
+    if source.platform in (Platform.FEISHU, Platform.MATTERMOST) 
+       and source.thread_id    # ← 问题在这！Channel 根消息时为 None
+       and event_message_id
+    else None
+)
+
+# 正确修复（对 Mattermost 不要求 source.thread_id）
+_progress_reply_to = (
+    event_message_id
+    if (
+        (source.platform == Platform.FEISHU and source.thread_id)
+        or source.platform == Platform.MATTERMOST   # ← 不要求 thread_id
+    ) and event_message_id
+    else None
+)
+```
+
+上游"修了"但保留了 `source.thread_id` 条件，而 Mattermost 的 Thread 是 Hermes 回复时才创建的——用户在 Channel 根级别发消息时 `source.thread_id` 始终为 None，所以修复对 Channel→Thread 场景完全无效。
+
+**验证方法**（删除本地 patch 前必做）：
+1. 在源码中确认上游修复的条件分支覆盖了所有本地 patch 覆盖的场景
+2. 至少做一次端到端测试（特别是本地 patch 专门处理的边界场景）
+3. 不止看 changelog/commit message，要看实际代码变更
+
+**安全策略**：如果无法确认上游修复的完整性，宁可保留本地 patch（带 `else: SKIP` 幂等检测），也不要贸然删除。

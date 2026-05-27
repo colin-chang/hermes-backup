@@ -17,7 +17,7 @@
 **通道关闭确认：**
 - 2026年5月30日起，全部 9 个现行 OINP 类别永久关闭，替换为 4 个新整合通道（安省监管变更已通过）
 - 来源：immigration.ca、CIC News (2026.03)、Liberty Immigration、Ontario .ca Program Updates
-- **对本案影响：家庭 2026 年 6 月登陆，晚于关闭日期，OINP 硕士通道不适用**
+- **对本案影响：家庭 2026 年 9 月登陆，晚于关闭日期，OINP 硕士通道不适用**
 
 **合规障碍发现（已官方验证，2026.05 法条编号更正）：**
 - OINP 硕士通道居住要求（来源：[O.Reg 422/17 s.8(3)](https://www.ontario.ca/laws/regulation/170422)，2026年5月 e-Laws 现行合并文本。⚠️ 旧版编号 8.4+8.7 已被合并为单一 Section 8(3)）：

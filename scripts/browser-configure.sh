@@ -16,15 +16,15 @@
 #
 #   ┌─────────────────────┬──────────────────┬───────────────────┬──────────────────┐
 #   │       方案           │  bb-browser      │ buildin-isolation │  buildin-inspect │
-#   │                     │ （★默认推荐★）     │                   │                  │
+#   │                     │ （★默认推荐★）    │                   │                  │
 #   ├─────────────────────┼──────────────────┼───────────────────┼──────────────────┤
 #   │ 实现原理              │ 独立 user-data-  │ 独立 user-data-    │ 主 Chrome 默认    │
 #   │                     │ dir + 最小拷贝    │ dir + 最小拷贝      │ profile + inspect│
 #   │ Chrome 实例          │ 独立（隔离）      │ 独立（隔离）         │ 主 Chrome（共享）  │
 #   │ 生命周期管理          │ daemon 自动      │ 手动启动/关闭        │ 用户手动开启选项    │
-#   │ 登录态来源            │ 主 profile 拷贝  │ 主 profile 拷贝     │ 实时共享          │
-#   │ 每次连接是否弹授权     │ ✅ 无            │ ✅ 无               │ ❌ 有（每次弹窗）  │
-#   │ 适合批量/密集操作      │ ✅ 是            │ ✅ 是              │ ❌ 否             │
+#   │ 登录态来源            │ 主 profile 拷贝  │ 主 profile 拷贝     │ 实时共享           │
+#   │ 每次连接是否弹授权     │ ✅ 无            │ ✅ 无               │ ❌ 有（每次弹窗）   │
+#   │ 适合批量/密集操作      │ ✅ 是            │ ✅ 是              │ ❌ 否              │
 #   │ 影响日常浏览          │ ❌ 不影响         │ ❌ 不影响           │ ✅ 共享同一窗口     │
 #   │ 启动复杂度            │ 一键 daemon      │ 手动起 Chrome       │ Chrome 内点选项    │
 #   │ 资源占用              │ 中（独立进程）     │ 中（独立进程）       │ 低（复用主 Chrome) │
@@ -392,7 +392,7 @@ run_bb_browser() {
         echo "$(_color red '❌') 未检测到 bb-browser CLI"
         echo ""
         echo "请先安装 bb-browser:"
-        echo "   npm install -g @epiral/bb-browser"
+        echo "   npm install -g bb-browser"
         echo "   或参考: https://github.com/epiral/bb-browser"
         exit 1
     fi
@@ -521,8 +521,38 @@ PYEOF
         echo "$(_color green '✅') Chrome 启动参数正确（无 --use-mock-keychain）"
     fi
 
-    # bb-browser 通过 MCP 协议直连 daemon，不需要写入 .env
     echo "$(_color green '✅') bb-browser daemon 已启动"
+
+    # 8. 读取 daemon CDP 端口并写入 BROWSER_CDP_URL
+    #    MCP 已于 v0.13 移除，改用 CDP 直连 Hermes browser_* 工具
+    #    Hermes 优先读 BROWSER_CDP_URL 环境变量（browser_tool.py 第 294 行）
+    echo ""
+    echo "── 步骤 5/5: 配置 Hermes CDP 直连 ──"
+    local cdp_port ws_url
+    cdp_port=9222
+    # 从 daemon.json 读取实际端口（优先）
+    if [ -f "$HOME/.bb-browser/daemon.json" ]; then
+        local json_port
+        json_port=$(python3 -c "
+import json
+with open('$HOME/.bb-browser/daemon.json') as f:
+    d = json.load(f)
+print(d.get('cdpPort', 9222))
+" 2>/dev/null || echo 9222)
+        cdp_port="$json_port"
+    fi
+
+    echo "   CDP 端口: $cdp_port"
+    echo "   等待 Chrome CDP 服务就绪（最多 10s）..."
+    if ws_url=$(_wait_for_cdp "$cdp_port" 10); then
+        _update_env "$ws_url" "BB Browser Chrome CDP (daemon 管理，端口 $cdp_port)"
+        echo "   $(_color green '✅') BROWSER_CDP_URL 已写入 ~/.hermes/.env"
+        echo "   $(_color dim \"$ws_url\")"
+    else
+        echo "$(_color yellow '⚠️') CDP 未在 ${cdp_port} 端口就绪"
+        echo "   可能原因: Chrome 启动参数被修改，或端口冲突"
+        echo "   手动检查: curl -s http://127.0.0.1:${cdp_port}/json/version"
+    fi
 
     echo ""
     echo "$(_color green '🎉 bb-browser 方案配置完成！')"
@@ -531,6 +561,7 @@ PYEOF
     echo "  - 查看 daemon 状态: bb-browser daemon status"
     echo "  - 主 Chrome 登录态变更后，重新运行本脚本即可"
     echo "  - bb-browser 更新后需重新运行本脚本（自动修补 --use-mock-keychain）"
+    echo "  - Hermes browser_* 工具现在通过 CDP 直连 Chrome 实例（无需重启 Gateway）"
 }
 
 # =============================================================================

@@ -34,6 +34,7 @@ metadata:
 - AI Agent 架构、多模型调度、工具链编排
 - Hermes/OpenClaw/Claude Code/Dify/n8n 等工具深度掌握
 - Hermes 多平台选型与渲染优化（平台对比矩阵见 `references/hermes-platform-comparison.md`）
+- Hermes 插件 override 模式：`register_platform` 覆盖 bundled plugin 时必须携带所有 hooks（见 `references/hermes-platform-plugin-override.md`）
 - 本地模型部署与性能调优（Ollama 优化指南见 `references/ollama-performance-tuning.md`）
 - Mattermost Docker 部署与推送通知配置（见 `references/mattermost-docker-push-notifications.md`）
 - Mattermost Webapp Markdown 表格渲染管线与 iPad 端兼容性问题（见 `references/mattermost-table-rendering-architecture.md`）
@@ -96,15 +97,4 @@ metadata:
 
 ## 角色记忆管理
 
-本角色的专属记忆存储在 `references/role-memory.md` 中。与全局 MEMORY.md 的分工如下：
-
-| 存储位置 | 内容 | 更新方式 |
-|---------|------|---------|
-| 全局 `memories/MEMORY.md`（2.2K 限制） | 所有角色共性的工具约定、环境事实、通用偏好 | `memory` 工具 |
-| 本角色 `references/role-memory.md`（无限制） | 技术项目进展、开发决策、工具配置细节、代码约定 | `skill_manage` 工具 |
-
-**更新规则：**
-- 对话中产生的**技术领域知识**（如某个项目的架构决策、配置优化经验）→ 通过 `skill_manage(action='patch', name='role-tech-advisor', file_path='references/role-memory.md', ...)` 更新到角色专属记忆
-- **全局性事实**（如 Chrome CDP 配置变更）→ 通过 `memory` 工具更新到全局 MEMORY.md
-- 不确定归属的内容 → 优先写入角色专属记忆，避免污染全局 MEMORY.md
-- 读取角色专属记忆：`skill_view(name='role-tech-advisor', file_path='references/role-memory.md')`
+本角色专属记忆存储在 `references/role-memory.md`，更新规则遵循 SOUL.md 中的「记忆管理分层」：领域知识 → `skill_manage`；全局事实 → `memory`。

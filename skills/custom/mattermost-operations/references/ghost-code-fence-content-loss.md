@@ -8,20 +8,55 @@
 - 方案 B 的 CSS 代码块正常、优缺点文字正常，但 **`#### 🥈 方案 B：...` 标题被渲染为纯文本**（不像是标题）
 - 方案 C/D 后续内容正常
 
-## 根因
+## 根因（纠正于 2026-05-27）
 
-`BasePlatformAdapter.truncate_message()` 的代码块 carry-over 机制在特定条件下失效：
+> ⚠️ **初版诊断有误**。初始分析认为是 "short-circuit 路径未 prepend prefix"，但实际 bug 是相反的 —— prefix **确实被 prepend 了**，但原始内容中紧接其后的 ` ``` ` 立即将其闭合，产生幽灵空块。
 
-1. Chunk 1 在 fenced code block 内被截断 → 正确检测到 `in_code=True`，设置 `carry_lang="scss"`
-2. Chunk 2 的剩余内容触发 short-circuit 路径（line 3666-3668）：
-   ```python
-   if _len(prefix) + _len(remaining) <= max_length - INDICATOR_RESERVE:
-       chunks.append(prefix + remaining)
-       break
+`BasePlatformAdapter.truncate_message()` 的代码块 carry-over 机制：
+
+1. Chunk 1 在 fenced code block 内被截断 → 正确检测到 `in_code=True`，设置 `carry_lang="python"`
+2. Chunk 1 末尾追加 `\n``` ` 闭合围栏
+3. Chunk 2 循环时 `carry_lang` 仍然为 `"python"` → 正确 `prefix = "```python\n"`
+4. **Bug**：此时 `remaining` 的开头就是原始内容中的闭合 ` ``` `（因为上一轮 split 正好切在闭合围栏之前）：
    ```
-3. **Bug**：short-circuit 路径应该将 `prefix`（如 `"```scss\n"`）prepend 到 chunk 2 开头，但实际交付的消息开头缺失了 code fence
-4. 缺少开启围栏 → Chunk 2 中 Chunk 1 末尾的闭合 ` ``` ` 在 CommonMark 解析器中变成**新的开启围栏**（幽灵围栏）
-5. 幽灵围栏之后、下一个 ` ``` ` 之前的所有内容（包括 `#### 🥈 方案 B` 标题）被吞入代码块，渲染为纯文本
+   prefix = "```python\n"
+   remaining = "```\nsome content\n..."
+   ```
+5. Chunk 2 的完整内容变成 ` ```python\n```\nsome content` — 前两行构成一个**幽灵空代码块**
+6. Chunk 2 后续正常处理会检测到 `in_code=False`（围栏已闭合），不追加额外闭合围栏
+7. 幽灵空块本身无害（空内容），但如果 `remaining` 在触发 short-circuit 前**同时包含**幽灵块和后续内容，CommonMark 解析时幽灵块后的内容不受影响
+
+### 真正的危害场景
+
+当幽灵空前缀 + 剩余内容触发 short-circuit（line 4161）时：
+```python
+if _len(prefix) + _len(remaining) <= max_length - INDICATOR_RESERVE:
+    chunks.append(prefix + remaining)  # "```python\n```\nsome content..."
+    break
+```
+Chunk 2 = ` ```python\n```\nsome content... (2/2)` — 幽灵空块 + 内容。
+
+**更严重的情况**：如果 `remaining` 头部就是 ` ``` ` 但后续没有另一个 ` ``` ` 来重新开启 → 后续内容（如 markdown 标题）被吞入幽灵块的开围栏中，渲染为纯文本。
+
+### 修复（已应用于 base.py）
+
+在 while 循环中，判断前缀之前先检测：**如果 `carry_lang` 不为 None 且 `remaining` 首行就是 bare ` ``` `**，说明这是原始内容的闭合围栏，不应重新打开：
+
+```python
+if carry_lang is not None:
+    stripped_line = remaining.lstrip().split("\n", 1)[0].rstrip()
+    if stripped_line.startswith("```") and not stripped_line[3:].strip():
+        # 首行是 bare ``` — 消费它，不重新打开围栏
+        idx = remaining.index("```")
+        remaining = remaining[idx + 3:]
+        if remaining.startswith("\n"):
+            remaining = remaining[1:]
+        remaining = remaining.lstrip()
+        carry_lang = None
+        continue
+```
+
+已注册为 `hermes-patches.sh` P53。
 
 ## 复现条件
 

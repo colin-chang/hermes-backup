@@ -75,7 +75,7 @@ metadata:
 - **角色绑定**: 加载 `role-canada-affairs` + `doko-research` + `doko-search` + `doko-summarize` + `dokobot` + `nomad-imessage`
 - **模型**: `bytedance/doubao-seed-2.0-pro`
 - **投递**: Mattermost 频道
-- **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [nomad-imessage](custom/nomad-imessage)
+- **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [nomad-imessage](nomad-imessage)
 - **Cron toolsets**: `terminal, web, browser, vision, memory, session_search, code_execution`（注意是 toolset 名 `code_execution`，不是 tool 名 `execute_code`）
 - **⚠️ 事故总结**：根因是 `cron/jobs.json` 中 `enabled_toolsets` 写了 tool 名 `execute_code` 而非 toolset 名 `code_execution`。`terminal`/`web`/`browser` 碰巧同名所以一直正常。详见 `references/cron-emoji-failure-postmortem.md`
 
@@ -94,14 +94,4 @@ metadata:
 
 ## 角色记忆管理
 
-本角色的专属记忆存储在 `references/role-memory.md` 中。与全局 MEMORY.md 的分工如下：
-
-| 存储位置 | 内容 | 更新方式 |
-|---------|------|---------|
-| 全局 `memories/MEMORY.md`（2.2K 限制） | 所有角色共性的工具约定、环境事实、通用偏好 | `memory` 工具 |
-| 本角色 `references/role-memory.md`（无限制） | 移民政策更新、税务案例、本地生活经验、申请进度 | `skill_manage` 工具 |
-
-**更新规则：**
-- 对话中产生的**加拿大事务领域知识**（如IRCC政策更新、税务筹划案例、本地生活经验）→ 通过 `skill_manage(action='patch', name='role-canada-affairs', file_path='references/role-memory.md', ...)` 更新
-- **全局性事实**（如工具配置变更）→ 通过 `memory` 工具更新到全局 MEMORY.md
-- 读取角色专属记忆：`skill_view(name='role-canada-affairs', file_path='references/role-memory.md')`
+本角色专属记忆存储在 `references/role-memory.md`，更新规则遵循 SOUL.md 中的「记忆管理分层」：领域知识 → `skill_manage`；全局事实 → `memory`。

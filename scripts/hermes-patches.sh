@@ -14,14 +14,23 @@
 #   5.  cron/jobs.py                      — Cron job 中文存储修复
 #   6.  gateway/platforms/mattermost.py   — ❌ _resolve_root_id（已迁移到 mattermost-enhancer 插件）
 #   7.  gateway/platforms/mattermost.py   — ❌ DM 审批基础设施（已迁移到 mattermost-enhancer 插件）
-#   8.  gateway/run.py                    — ✅ DM 审批 + 工具进度 Thread 路由（已迁移到 mattermost-enhancer 插件）
-#   9.  utils.py                          — YAML 中文写入修复
-#  10. MEDIA 正则收紧                    — 防止误匹配非文件路径
+#   8.  gateway/run.py                    — ❌ DM 审批 + 工具进度 Thread 路由（已迁移到 mattermost-enhancer 插件）
+#   9.  gateway/run.py                    — ❌ Clarify Session 分裂修复（已迁移到 mattermost-enhancer 插件）
+#  10.  gateway/run.py                    — ❌ Clarify 并发守护（已迁移到 mattermost-enhancer 插件）
+#  11.  gateway/platforms/mattermost.py   — ❌ Thread root_id fallback（已迁移到 mattermost-enhancer 插件）
+#  12.  utils.py                          — YAML 中文写入修复
+#  13.  MEDIA 正则收紧                    — 防止误匹配非文件路径
 #     a. gateway/run.py                  — 工具结果扫描：要求路径格式
-#     b. gateway/platforms/base.py       — extract_media() 去掉 \\S+ 兜底
+#     b. gateway/platforms/base.py       — extract_media() 去掉 \\\\S+ 兜底
 #     c. gateway/platforms/mattermost.py — ❌ MEDIA 静默跳过（已迁移到 mattermost-enhancer 插件）
+#  P50. gateway/stream_consumer.py        — 评论→正文合并，防止消息碎片化
+#  P53. gateway/platforms/base.py         — truncate_message 幽灵代码围栏修复
+#  P55. gateway/stream_consumer.py        — stream fallback 发送丢失 reply_to，Thread 回复跑到频道根级别
+#  P57. gateway/run.py                    — 工具进度消息不在 Thread 中：Mattermost 不应要求 source.thread_id
+#  ❌ P54. WebSocket 心跳 30s→15s — 已迁移到 mattermost-enhancer 插件（覆写 _ws_connect_and_listen）
+#  ❌ P56. _api_put 缺少 timeout — 已迁移到 mattermost-enhancer 插件（覆写 edit_message）
 #
-#  ❌ 6-8, 10c. Mattermost 补丁（已迁移到 mattermost-enhancer 插件）
+#  ❌ 6-10, 11, 13c. Mattermost 补丁（已迁移到 mattermost-enhancer 插件）
 #
 # 使用方法：
 #   ./hermes-patches.sh check   # 检查当前状态（默认）
@@ -55,17 +64,18 @@ _patch_registry=(
     "hermes_cli/providers.py|模型列表太乱：自定义 provider 显示了全部 100+ 模型而不是只显示你精选的几个|startswith.*\"custom:\""
     "hermes_cli/doctor.py|hermes doctor 误报：用了自定义 provider 就弹「模型不匹配」假警告|startswith.*\"custom:\""
     "hermes_cli/model_switch.py|模型白名单没生效：config 里设了 models 限制但切模型时全跑出来了|and not models_list"
-    "hermes_cli/model_switch.py|同上：custom_providers 的 models 白名单也一样被无视了|if not grp\\[\"models\"\\]"
+    "hermes_cli/model_switch.py|同上：custom_providers 的 models 白名单也一样被无视了|not grp\[\"models\"\]"
     "gateway/config.py|Gateway 重启提醒关不掉：明明设了 false 重启时还是收到那条消息|\"gateway_restart_notification\" in platform_cfg"
     "gateway/config.py|同上：另一个读取路径也没读到你的配置|extra.*gateway_restart_notification"
     "cron/jobs.py|定时任务中文变乱码：描述里的汉字全变成 \\uXXXX 转义符|ensure_ascii=False"
     "utils.py|config.yaml 中文变乱码：配置文件里的中文注释被保存成 \\uXXXX|allow_unicode=True"
     "gateway/run.py|聊天里莫名出现 (file not found: ...) 垃圾消息|_TOOL_MEDIA_RE"
     "gateway/platforms/base.py|同上：另一个文件提取路径也抓到了假文件路径|\\$))"
-    "gateway/platforms/mattermost.py|Thread 里长时间任务的进度消息跑到频道去了|_raw_root = post.get"
-    "gateway/run.py|Clarify 问题等待回复时用户回复被当成新会话（Session 分裂，Agent 答非所问）|_canonical_entry = self.session_store.get_or_create_session"
-    "gateway/run.py|Clarify concurrency guard: 防止 clarify 阻塞期间新消息创建重复 Session|Gateway intercepted clarify at session guard"
     "gateway/stream_consumer.py|回复碎成很多条消息：Agent 评论文字和正文被拆成多条独立消息|Accumulate commentary"
+    "gateway/platforms/base.py|长代码块跨chunk分片时出现幽灵代码围栏空块|reopening the fence would create"
+    "gateway/stream_consumer.py|Thread回复丢失：stream fallback发消息时没传reply_to导致不在Thread里|reply_to=self._initial_reply_to_id"
+    "gateway/run.py|工具进度消息不在Thread中：Mattermost不应要求source.thread_id|or source.platform == Platform.MATTERMOST"
+    "gateway/run.py|Gateway重启后session串台：多条Thread同时auto-resume导致消息跑到错误的Thread|Deduplicate.*keep only the most recent"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -225,14 +235,14 @@ file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
 
-old = '''            # Live model discovery from custom provider endpoints (matches
-            # Section 3 behavior for user ``providers:`` entries).
-            if api_url and api_key:'''
+old = '''            should_probe = bool(api_url) and (bool(api_key) or not grp["models"])
+            if should_probe:'''
 
-new = '''            # Live model discovery — only when the user has NOT supplied
-            # a curated model list in config.yaml (models: field).
-            # A non-empty curated list takes priority over live discovery.
-            if not grp["models"] and api_url and api_key:'''
+new = '''            # Only run live discovery when the user has NOT supplied
+            # a curated model list AND has credentials. A non-empty
+            # curated list takes priority over live discovery.
+            should_probe = bool(api_url) and bool(api_key) and not grp["models"]
+            if should_probe:'''
 
 if old in content:
     content = content.replace(old, new)
@@ -451,138 +461,6 @@ PYEOF
 
     [[ $media_ok -gt 0 ]] && ok "MEDIA 正则收紧 — 已装好 ✅"
 
-    # ── 11. mattermost.py Thread root_id fallback ────────────────────────────
-    _do_patch "gateway/platforms/mattermost.py" \
-        "Thread 里长时间任务的进度消息跑到频道去了" \
-        '_raw_root = post.get' <<'PYEOF'
-import sys
-file_path = sys.argv[1]
-with open(file_path, 'r') as f:
-    content = f.read()
-
-old = '''        # Thread support: if the post is in a thread, use root_id.
-        thread_id = post.get("root_id") or None'''
-
-new = '''        # Thread support: if the post is in a thread, use root_id.
-        _raw_root = post.get("root_id")
-        if _raw_root:
-            thread_id = _raw_root
-        elif self._reply_mode == "thread":
-            # root_id="" can mean either a genuine thread-root post OR a
-            # reply whose root_id was lost (Mattermost WebSocket anomaly).
-            # Ask the REST API before blindly trusting the WebSocket event.
-            try:
-                post_data = await self._api_get(f"posts/{post_id}")
-                api_root = post_data.get("root_id") if post_data else None
-                if isinstance(api_root, str) and api_root:
-                    thread_id = api_root
-                else:
-                    thread_id = post_id
-            except Exception:
-                thread_id = post_id
-        else:
-            thread_id = None'''
-
-if old in content:
-    content = content.replace(old, new)
-    with open(file_path, 'w') as f:
-        f.write(content)
-    print("APPLIED")
-else:
-    print("SKIP")
-PYEOF
-
-    # ── P46: Clarify Session 分裂 ───────────────────────────────────────────
-    _do_patch "gateway/run.py" \
-        "Clarify 问题等待回复时用户回复被当成新会话（Session 分裂，Agent 答非所问）" \
-'_canonical_entry = self.session_store.get_or_create_session' <<'PYEOF'
-import sys
-file_path = sys.argv[1]
-with open(file_path, 'r') as f:
-    content = f.read()
-
-old = '''            _pending_clarify = _clarify_mod.get_pending_for_session(_quick_key)
-        except Exception:
-            _pending_clarify = None'''
-
-new = '''            _pending_clarify = _clarify_mod.get_pending_for_session(_quick_key)
-            # P46 fix: when _quick_key doesn't match (e.g. due to
-            # thread_sessions_per_user config mismatch), fall back to the
-            # canonical session key from get_or_create_session.  Without
-            # this, the clarify is not found → message falls through
-            # → a new Session is created → two Sessions run in parallel
-            # in the same Thread (Session split).
-            # Guard: only in Thread contexts where session key mismatch
-            # can actually occur.  Non-Thread paths (DM, channel root)
-            # always have _quick_key == canonical key, and calling
-            # get_or_create_session here breaks Telegram topic mode
-            # lobby (which asserts it's never called).
-            if _pending_clarify is None and source.thread_id:
-                try:
-                    _canonical_entry = self.session_store.get_or_create_session(source)
-                    _canonical_key = _canonical_entry.session_key
-                    if _canonical_key != _quick_key:
-                        _pending_clarify = _clarify_mod.get_pending_for_session(_canonical_key)
-                except Exception:
-                    pass
-        except Exception:
-            _pending_clarify = None'''
-
-if old in content:
-    content = content.replace(old, new)
-    with open(file_path, 'w') as f:
-        f.write(content)
-    print("APPLIED")
-else:
-    print("SKIP")
-PYEOF
-
-
-    # ── P46b: Clarify concurrency guard  ─────────────────────────────────
-    _do_patch "gateway/run.py" \
-        "Clarify concurrency guard: _handle_message_with_agent intercept" \
-        'Gateway intercepted clarify at session guard' <<'PYEOF'
-import sys
-file_path = sys.argv[1]
-with open(file_path, "r") as f:
-    content = f.read()
-
-old = "        session_key = session_entry.session_key\n        self._cache_session_source(session_key, source)"
-
-new = "        session_key = session_entry.session_key\n"
-new += "        # P46 concurrency guard: belt-and-suspenders clarify check using\n"
-new += "        # the canonical session key.  The earlier check in _handle_message\n"
-new += "        # uses _quick_key which may differ from session_key when\n"
-new += "        # thread_sessions_per_user configs diverge.  When keys differ and\n"
-new += "        # no agent is found in _running_agents under _quick_key, a new\n"
-new += "        # Session is spawned before the clarify-blocked agent can respond.\n"
-new += "        if session_key != _quick_key:\n"
-new += "            try:\n"
-new += '                from tools import clarify_gateway as _clarify_mod2\n'
-new += "                _pc = _clarify_mod2.get_pending_for_session(session_key)\n"
-new += "                if _pc is not None:\n"
-new += '                    _raw = (event.text or "").strip()\n'
-new += '                    if _raw and not _raw.startswith("/"):\n'
-new += "                        _clarify_mod2.resolve_gateway_clarify(_pc.clarify_id, _raw)\n"
-new += "                        logger.info(\n"
-new += '                            "Gateway intercepted clarify at session guard "\n'
-new += '                            "(session=%s, clarify_id=%s)",\n'
-new += "                            session_key, _pc.clarify_id,\n"
-new += "                        )\n"
-new += "                        return None  # consumed by clarify -- no new turn\n"
-new += "            except Exception:\n"
-new += "                pass\n"
-new += "        self._cache_session_source(session_key, source)"
-
-if old in content:
-    content = content.replace(old, new, 1)
-    with open(file_path, "w") as f:
-        f.write(content)
-    print("APPLIED")
-else:
-    print("SKIP")
-PYEOF
-
     # ── P50: 评论→正文合并 ────────────────────────────────────────────────
     _do_patch "gateway/stream_consumer.py" \
         "回复碎成很多条消息：Agent 评论文字和正文被拆成多条独立消息" \
@@ -615,6 +493,171 @@ else:
     print("SKIP")
 PYEOF
 
+    # ── P53: truncate_message 幽灵代码围栏 ─────────────────────────────────
+    _do_patch "gateway/platforms/base.py" \
+        "长代码块跨chunk分片时出现幽灵代码围栏空块" \
+        'reopening the fence would create' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, "r") as f:
+    content = f.read()
+
+old = """        while remaining:
+            # If we're continuing a code block from the previous chunk,
+            # prepend a new opening fence with the same language tag.
+            prefix = f\"```{carry_lang}\\n\" if carry_lang is not None else \"\""""
+
+new = """        while remaining:
+            # When the previous chunk's closing fence is immediately followed
+            # by the original content's own closing `` ``` `` (because the
+            # split cut right before it), reopening the fence would create a
+            # ghost empty block::
+            #
+            #     ```python
+            #     ```
+            #
+            # Detect this and consume the original closing fence without
+            # reopening, so the code block ends cleanly at the chunk boundary.
+            if carry_lang is not None:
+                stripped_line = remaining.lstrip().split("\\n", 1)[0].rstrip()
+                if stripped_line.startswith("```") and not stripped_line[3:].strip():
+                    # The first meaningful line is a bare `` ``` `` — the
+                    # original closing fence.  Consume it and clear the
+                    # carry so we don't reopen.
+                    idx = remaining.index("```")
+                    remaining = remaining[idx + 3:]
+                    if remaining.startswith("\\n"):
+                        remaining = remaining[1:]
+                    remaining = remaining.lstrip()
+                    carry_lang = None
+                    continue
+
+            # If we're continuing a code block from the previous chunk,
+            # prepend a new opening fence with the same language tag.
+            prefix = f\"```{carry_lang}\\n\" if carry_lang is not None else \"\""""
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── P55: stream_consumer fallback 丢失 reply_to ──────────────────────
+    _do_patch "gateway/stream_consumer.py" \
+        "Thread回复丢失：stream fallback发消息时没传reply_to导致不在Thread里" \
+        'reply_to=self._initial_reply_to_id' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, "r") as f:
+    content = f.read()
+
+old = """                result = await self.adapter.send(
+                    chat_id=self.chat_id,
+                    content=chunk,
+                    metadata=self.metadata,
+                )"""
+
+new = """                result = await self.adapter.send(
+                    chat_id=self.chat_id,
+                    content=chunk,
+                    reply_to=self._initial_reply_to_id,
+                    metadata=self.metadata,
+                )"""
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── P57: 工具进度消息进 Thread ───────────────────────────────────────
+    _do_patch "gateway/run.py" \
+        "工具进度消息不在Thread中：Mattermost不应要求source.thread_id" \
+        'or source.platform == Platform.MATTERMOST' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, "r") as f:
+    content = f.read()
+
+old = """        _progress_reply_to = (
+            event_message_id
+            if source.platform in (Platform.FEISHU, Platform.MATTERMOST) and source.thread_id and event_message_id
+            else None
+        )"""
+
+new = """        _progress_reply_to = (
+            event_message_id
+            if (
+                (source.platform == Platform.FEISHU and source.thread_id)
+                or source.platform == Platform.MATTERMOST
+            ) and event_message_id
+            else None
+        )"""
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── P58: Session 串台修复 — 同 channel 多 thread auto-resume 去重 ──────
+    _do_patch "gateway/run.py" \
+        "Gateway重启后session串台：多条Thread同时auto-resume导致消息跑到错误的Thread" \
+        'Deduplicate.*keep only the most recent' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, "r") as f:
+    content = f.read()
+
+old = """        except Exception as exc:
+            logger.warning("Failed to enumerate resume-pending sessions: %s", exc)
+            return 0
+
+        now = datetime.now()"""
+
+new = """        except Exception as exc:
+            logger.warning("Failed to enumerate resume-pending sessions: %s", exc)
+            return 0
+
+        # Deduplicate: keep only the most recent session per (platform, chat_id).
+        # When multiple threads in the same channel are auto-resumed
+        # simultaneously (e.g. after a gateway crash), responses from one
+        # thread can leak into another — the user sees a message about
+        # an unrelated topic appearing in their current thread.
+        _per_chat: dict = {}
+        for entry in candidates:
+            key = (entry.origin.platform, entry.origin.chat_id)
+            existing = _per_chat.get(key)
+            if (
+                existing is None
+                or (
+                    entry.updated_at
+                    and existing.updated_at
+                    and entry.updated_at > existing.updated_at
+                )
+            ):
+                _per_chat[key] = entry
+        candidates = list(_per_chat.values())
+
+        now = datetime.now()"""
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
 
 }
 

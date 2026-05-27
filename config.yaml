@@ -63,27 +63,24 @@ model:
   default: deepseek/deepseek-v4-pro
   read_timeout: 300
 
-# 辅助模型（均走 ZenMux）
+# 辅助模型（均走 ZenMux，按功能字母序）
 auxiliary:
-  vision:
+  approval:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-  web_extract:
-    provider: custom:zenmux
-    model: minimax/minimax-m2.7
   compression:
     provider: custom:zenmux
     model: deepseek/deepseek-v4-pro
+  curator:
+    provider: custom:zenmux
+    model: google/gemini-3.1-flash-lite
+  mcp:
+    provider: custom:zenmux
+    model: minimax/minimax-m2.7
   session_search:
     provider: custom:zenmux
     model: minimax/minimax-m2.7
   skills_hub:
-    provider: custom:zenmux
-    model: minimax/minimax-m2.7
-  approval:
-    provider: custom:zenmux
-    model: google/gemini-3.1-flash-lite
-  mcp:
     provider: custom:zenmux
     model: minimax/minimax-m2.7
   title_generation:
@@ -92,9 +89,12 @@ auxiliary:
   triage_specifier:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-  curator:
+  vision:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
+  web_extract:
+    provider: custom:zenmux
+    model: minimax/minimax-m2.7
 
 
 
@@ -111,7 +111,11 @@ terminal:
 
 # 网络搜索
 web:
-  backend: brave-free  # 默认空
+  search_backend: brave-free  # 默认空
+
+# 会话管理
+sessions:
+  auto_prune: true
 
 # 审批与权限
 approvals:
@@ -122,10 +126,6 @@ approvals:
 # 定时任务
 cron:
   wrap_response: false
-
-# 会话管理
-sessions:
-  auto_prune: true
 
 # ── 集成层 ──────────────────────────────────────────────────────────
 
@@ -141,12 +141,6 @@ mattermost:
 
 # MCP 服务器
 mcp_servers:
-  bb-browser:
-    command: npx
-    args:
-      - -y
-      - bb-browser
-      - --mcp
   qmd:
     command: qmd
     args:
@@ -172,7 +166,7 @@ display:
     enabled: true
     fields:
       - model
-      - context_pct  
+      - context_pct
   platforms:
     mattermost:
       streaming: true
@@ -201,22 +195,6 @@ video_gen:
 
 # ── 管理层 ──────────────────────────────────────────────────────────
 
-# 技能管理
-curator:
-  backup:
-    keep: 3
-
-# 引导状态（已完成的 onboarding 提示）
-onboarding:
-  seen:
-    openclaw_residue_cleanup: true
-    tool_progress_prompt: true
-    busy_input_prompt: true
-
-# 更新与维护
-updates:
-  pre_update_backup: true
-
 # 平台工具集
 platform_toolsets:
   cli:
@@ -238,41 +216,34 @@ platform_toolsets:
     - vision
     - web
   mattermost:
-    - browser
     - clarify
-    - code_execution
-    - computer_use
     - cronjob
     - delegation
     - file
-    - image_gen
     - memory
     - messaging
     - session_search
     - skills
     - terminal
     - todo
-    - tts
     - vision
     - web
-  telegram:
-    - hermes-telegram
-  whatsapp:
-    - hermes-whatsapp
-  slack:
-    - hermes-slack
-  signal:
-    - hermes-signal
-  homeassistant:
-    - hermes-homeassistant
-  qqbot:
-    - hermes-qqbot
-  yuanbao:
-    - hermes-yuanbao
-  teams:
-    - hermes-teams
-  google_chat:
-    - hermes-google_chat
+
+# 技能管理
+curator:
+  backup:
+    keep: 3
+
+# 引导状态（已完成的 onboarding 提示）
+onboarding:
+  seen:
+    openclaw_residue_cleanup: true
+    tool_progress_prompt: true
+    busy_input_prompt: true
+
+# 更新与维护
+updates:
+  pre_update_backup: true
 
 
 # ── 安全 ────────────────────────────────────────────────────────────
