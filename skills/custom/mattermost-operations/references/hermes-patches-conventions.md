@@ -108,6 +108,24 @@ _patch_registry=(
 
 **验证方法**：`echo "$check" | cat -v` 查看实际字符。应为 `|$))`。
 
+## Pitfall 6：check_grep 跨行匹配需用 `ML:` 前缀
+
+`grep` 默认按行匹配，无法跨行搜索。当补丁引入的代码跨越两行时（如函数调用参数列表中插入新参数），普通 `grep -q` 会失败。
+
+新增 `ML:` 前缀支持：在 `_patch_registry` 中以 `ML:` 开头，`_do_patch()` 和 `show_status()` 自动切换为 `python3 -c "import re; re.search(pattern, content)"` 跨行匹配。
+
+```bash
+# ❌ 普通 grep — 跨行匹配失败
+"gateway/stream_consumer.py|P55: fallback reply_to|content=chunk,\\n.*reply_to=self._initial_reply_to_id"
+
+# ✅ ML: 前缀 — python3 re.search 跨行匹配
+"gateway/stream_consumer.py|P55: fallback reply_to|ML:content=chunk,\\n.*reply_to=self._initial_reply_to_id"
+```
+
+注意：
+- `ML:` 模式中使用 `\\n` 表示换行（bash 层转义后传给 python 的 `\n`）
+- `.*` 匹配换行符（`re.search` 默认 `.` 不匹配 `\n`，但 `\\n` 在模式中显式写为字面换行即可）
+
 1. [ ] 在 `_patch_registry` 中添加注册表项（`file|label|check_grep`）
 2. [ ] 在 `apply_all()` 函数内添加 `_do_patch` 调用（**确认在函数体内，不在顶层**）
 3. [ ] check_grep 是补丁**引入的新字符串**（不是补丁移除的旧字符串），且在文件中确实存在

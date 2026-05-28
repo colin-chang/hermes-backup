@@ -92,10 +92,6 @@ auxiliary:
   vision:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite
-  web_extract:
-    provider: custom:zenmux
-    model: minimax/minimax-m2.7
-
 
 
 # ── 行为层 ──────────────────────────────────────────────────────────
@@ -214,7 +210,7 @@ platform_toolsets:
     - todo
     - tts
     - vision
-    - web
+    - web_search
   mattermost:
     - clarify
     - cronjob
@@ -227,7 +223,7 @@ platform_toolsets:
     - terminal
     - todo
     - vision
-    - web
+    - web_search
 
 # 技能管理
 curator:

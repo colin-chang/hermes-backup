@@ -66,6 +66,12 @@ metadata:
 3. 真实用户案例：Reddit r/ImmigrationCanada/CanadaVisa论坛
 4. 中国官方：国家税务总局、外汇管理局、CRS法规
 
+### 跨国家移民对比研究
+当用户询问其他国家（新西兰、澳大利亚等）移民政策或要求与加拿大做对比时，参考：
+- `references/cross-country-immigration-research.md` — 研究框架 + 新西兰 2026 政策速查
+
+方法论：官方来源优先 → 核心参数提取（打分/职业清单/工资门槛/配偶条件）→ 家庭成员逐一对齐 → 表格化对比输出。
+
 ## 自动化任务
 
 ### 移民动态日报（Cron：每日 17:00 CST）
@@ -90,7 +96,23 @@ metadata:
 4. 通过 `skill_view` 读取角色专属记忆：`skill_view(name='role-canada-affairs', file_path='references/role-memory.md')`
 5. **涉及 CRA Direct Deposit / 银行绑定问题时**，读取银行路径参考：`skill_view(name='role-canada-affairs', file_path='references/cra-direct-deposit-banks.md')`
 6. **涉及 OINP 硕士通道法律条文核验时**，读取法条原文：`skill_view(name='role-canada-affairs', file_path='references/oinp-masters-legal-text.md')`
-6. **模型检查**：本角色推荐模型为 `anthropic/claude-sonnet-4.6`。若当前模型不一致，提示用户执行 `/model anthropic/claude-sonnet-4.6` 切换。不阻塞对话。
+7. **模型检查**：本角色推荐模型为 `anthropic/claude-sonnet-4.6`。若当前模型不一致，提示用户执行 `/model anthropic/claude-sonnet-4.6` 切换。不阻塞对话。
+
+### 按需加载的参考资料（不要自动加载全部）
+
+| 场景 | 参考文件 |
+|------|---------|
+| 跨国家移民对比（西班牙/葡萄牙/意大利等） | `references/cross-country-immigration-research.md` |
+| 西班牙 DNV 城市选择（瓦伦西亚 vs 马拉加） | `references/spain-city-comparison-valencia-malaga.md` |
+| 意大利、希腊、克罗地亚等 EU 数字游民签证 | `references/italy-eu-dnv-comparison.md` |
+
+### 西班牙 DNV 常见澄清（速查）
+
+- **年龄限制**：18 岁以上，无最高年龄上限
+- **行业限制**：无。只要能远程工作、收入达标、使用计算机通讯手段完成工作即可
+- **PR 移民监**：DNV 期间每年≥183 天且单次离境≤6 个月；获 PR 后单次离境≤12 个月
+- **PR ≠ 申根自由迁徙**：西班牙 PR 仅限西班牙境内；欧盟长期居留（UE版）去其他 EU 国仍需目的国批准
+- **续签风险**：每次续签都重审收入+工作关系+保险+居住天数，收入波动可能导致断签→时钟重置
 
 ## 角色记忆管理
 
