@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# update-gitlens.sh — GitLens Rebuild 版本自动更新与多端同步脚本 (V14)
+# update-gitlens.sh — GitLens Rebuild 版本自动更新与多端同步脚本 (V15)
 #
 # 用途：
 #   自动检测并安装 Rebuild-gitlens (第三方 GitLens 重建版) 的最新版本，
-#   实现本地 VS Code / Cursor 双 IDE 安装，并通过 SCP 同步到远程服务器，
+#   安装到本地 VS Code，并通过 SCP 同步到远程 VS Code Server，
 #   最后清理所有环境中旧版本残留。
 #
 # 触发方式：
@@ -16,12 +16,12 @@
 #   2. 版本合法性校验（semver 格式 + 非空非 null）
 #   3. 自动探测两种 VSIX 命名格式（纯版本号 vs 带 v 前缀）
 #   4. 比对本地已安装版本 + 远程服务器状态，若均最新则跳过
-#   5. 下载 VSIX 并本地安装到 VS Code 和 Cursor
-#   6. SCP 同步扩展目录到远程服务器 (orb) 的 4 个目标路径：
-#      - 本地: ~/.cursor/extensions + ~/.vscode/extensions
-#      - 远程: ~/.cursor-server/extensions + ~/.vscode-server/extensions
+#   5. 下载 VSIX 并本地安装到 VS Code
+#   6. SCP 同步扩展目录到远程服务器 (orb) 的 2 个目标路径：
+#      - 本地: ~/.vscode/extensions
+#      - 远程: ~/.vscode-server/extensions
 #   7. 用 jq 更新远程 extensions.json 中的 GitLens 版本和路径
-#   8. 清理本地+远程共 4 个目录中的旧版本扩展
+#   8. 清理本地+远程共 2 个目录中的旧版本扩展
 #
 # 关键设计：
 #   - set -euo pipefail 严格错误处理
@@ -31,7 +31,7 @@
 #   - 输出格式化适配 no_agent=true（stdout 直投递，无需 LLM 润色）
 #
 # 依赖：
-#   curl, ssh, scp, jq, find, /usr/local/bin/code, /usr/local/bin/cursor
+#   curl, ssh, scp, jq, find, /usr/local/bin/code
 #   SSH 免密登录远程主机 "orb"
 #
 
@@ -39,12 +39,8 @@ set -euo pipefail
 
 # ── 目录定义 ──────────────────────────────────────────────────────────────────
 LOCAL_VSCODE_DIR="$HOME/.vscode/extensions"
-LOCAL_CURSOR_DIR="$HOME/.cursor/extensions"
 REMOTE_HOST="orb"
 REMOTE_VSCODE_DIR="/home/colin/.vscode-server/extensions"
-REMOTE_CURSOR_DIR="/home/colin/.cursor-server/extensions"
-
-CURSOR_BIN="/usr/local/bin/cursor"
 
 TAGS_URL="https://github.com/AliverAnme/Rebuild-gitlens/tags"
 REPO_DOWNLOAD_BASE="https://github.com/AliverAnme/Rebuild-gitlens/releases/download"
@@ -114,11 +110,11 @@ else
 fi
 
 # ── 4. 检查本地安装情况 ─────────────────────────────────────────────────────
-CURRENT_DIR=$(find "$LOCAL_CURSOR_DIR" -maxdepth 1 -name "eamodio.gitlens-*" -type d 2>/dev/null | sort | tail -n 1 || true)
+CURRENT_DIR=$(find "$LOCAL_VSCODE_DIR" -maxdepth 1 -name "eamodio.gitlens-*" -type d 2>/dev/null | sort | tail -n 1 || true)
 CURRENT_VERSION=$(echo "$CURRENT_DIR" | sed 's/.*gitlens-//')
 
 # ── 5. 检查远程状态 ─────────────────────────────────────────────────────────
-REMOTE_CHECK=$(ssh "$REMOTE_HOST" "[ -d $REMOTE_CURSOR_DIR/eamodio.gitlens-$LATEST_VERSION ] && [ -d $REMOTE_VSCODE_DIR/eamodio.gitlens-$LATEST_VERSION ] && echo 'yes' || echo 'no'" 2>/dev/null || echo "no")
+REMOTE_CHECK=$(ssh "$REMOTE_HOST" "[ -d $REMOTE_VSCODE_DIR/eamodio.gitlens-$LATEST_VERSION ] && echo 'yes' || echo 'no'" 2>/dev/null || echo "no")
 
 # ── 6. 判断是否需要更新 ─────────────────────────────────────────────────────
 if [ "${CURRENT_VERSION:-}" == "$LATEST_VERSION" ] && [ "$REMOTE_CHECK" == "yes" ]; then
@@ -138,11 +134,6 @@ fi
 # ── 8. 本地安装（IDE CLI 自动维护 extensions.json）───────────────────────────
 if ! /usr/local/bin/code --install-extension "$TMP_FILE" --force; then
     report "$LATEST_VERSION" "更新失败" "VS Code 本地安装失败"
-    exit 1
-fi
-
-if ! "$CURSOR_BIN" --install-extension "$TMP_FILE" --force; then
-    report "$LATEST_VERSION" "更新失败" "Cursor 本地安装失败"
     exit 1
 fi
 
@@ -170,11 +161,10 @@ sync_to_remote() {
     ssh "$REMOTE_HOST" "jq 'map(if .identifier.id == \"eamodio.gitlens\" then .version = \"$LATEST_VERSION\" | .location.path = \"$NEW_PATH\" | .relativeLocation = \"$VERSION_DIR\" else . end)' $JSON_PATH > $JSON_PATH.tmp && mv $JSON_PATH.tmp $JSON_PATH"
 }
 
-sync_to_remote "$LOCAL_CURSOR_DIR" "$REMOTE_CURSOR_DIR"
 sync_to_remote "$LOCAL_VSCODE_DIR" "$REMOTE_VSCODE_DIR"
 
-# ── 10. 清理旧版本（本地 + 远程 4 个目录）───────────────────────────────────
-find "$LOCAL_CURSOR_DIR" "$LOCAL_VSCODE_DIR" -maxdepth 1 -name "eamodio.gitlens-*" ! -name "eamodio.gitlens-$LATEST_VERSION" -exec rm -rf {} + || true
-ssh "$REMOTE_HOST" "find $REMOTE_CURSOR_DIR $REMOTE_VSCODE_DIR -maxdepth 1 -name 'eamodio.gitlens-*' ! -name 'eamodio.gitlens-$LATEST_VERSION' -exec rm -rf {} +" || true
+# ── 10. 清理旧版本（本地 + 远程 2 个目录）───────────────────────────────────
+find "$LOCAL_VSCODE_DIR" -maxdepth 1 -name "eamodio.gitlens-*" ! -name "eamodio.gitlens-$LATEST_VERSION" -exec rm -rf {} + || true
+ssh "$REMOTE_HOST" "find $REMOTE_VSCODE_DIR -maxdepth 1 -name 'eamodio.gitlens-*' ! -name 'eamodio.gitlens-$LATEST_VERSION' -exec rm -rf {} +" || true
 
-report "$LATEST_VERSION" "已更新至新版本" "已同步 4 个环境 (VS Code + Cursor, 本地 + 远程)"
+report "$LATEST_VERSION" "已更新至新版本" "已同步 2 个环境 (VS Code 本地 + 远程)"
