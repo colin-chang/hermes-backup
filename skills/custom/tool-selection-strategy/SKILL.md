@@ -1,7 +1,7 @@
 ---
 name: tool-selection-strategy
 description: "定义信息获取与浏览器操作的工具优先级策略：Web Search → Dokobot 降级链，有 Site Adapter 优先用 BB Browser site CLI，通用交互用 Hermes browser_* 工具。"
-version: 1.4.0
+version: 1.5.0
 metadata:
   hermes:
     tags: [tool-selection, web-search, dokobot, browser-automation, bb-browser, fallback, priority]
@@ -61,9 +61,14 @@ metadata:
 
 ### 降级执行方式
 
+> ⚠️ **Dokobot CLI v2.11.0 的 `search` 子命令没有 `--local` flag**（仅 `read` 子命令支持）。因此降级搜索用 Google 搜索 URL + `dokobot read --local`：
+
 ```bash
-# web_search 失败 → 用 dokobot search 做搜索
-dokobot search '搜索关键词' --local
+# web_search 失败 → 用 dokobot read 打开 Google 搜索
+dokobot read 'https://www.google.com/search?q=搜索关键词' --local
+
+# 从搜索结果中提取目标 URL，再用 dokobot read 抓取全文
+dokobot read '<目标URL>' --local
 
 # 目标页面需要登录态 / JS 渲染 → 直接用 dokobot read
 dokobot read '<URL>' --local
@@ -173,7 +178,8 @@ BB Browser 也有 `open` / `snap` / `click` / `fill` 等浏览器自动化命令
 │   │   ├── 够用 → 直接回答（不调用 extract/read）
 │   │   └── 不够 → 3. dokobot read --local 抓取目标 URL 全文
 │   └── web_search 失败？
-│       └── dokobot search '关键词' --local（搜索+阅读一步到位）
+│       └── dokobot read 'https://www.google.com/search?q=关键词' --local
+│           （dokobot search 无 --local flag，用 Google 搜索 URL 替代）
 │
 └── 浏览器操作
     ├── 特定平台数据（36 平台 site adapter）？
@@ -197,14 +203,16 @@ BB Browser 也有 `open` / `snap` / `click` / `fill` 等浏览器自动化命令
 
 1. **🚫 在 search-only provider 环境下调用 `web_extract`** → 当前 `web.backend = brave-free` 不支持 extract。**永远不要调用 `web_extract`**——它会 100% 失败并浪费 ~114 tokens。`web_search` 拿到 URL 后直接 `dokobot read --local`。这是本 Skill 最重要的规则，违反 = 每轮都浪费一次 round-trip。
 2. **用 Dokobot 填写表单** → Dokobot 是只读的，应该用 Hermes 内置 `browser_*` 工具
-3. **Web Search 失败后直接放弃** → 必须降级到 `dokobot search --local`，不要跳过
+3. **Web Search 失败后直接放弃** → 必须降级到 `dokobot read 'https://www.google.com/search?q=...' --local`，不要跳过。注意 `dokobot search` **没有** `--local` flag（v2.11.0），用 Google 搜索 URL + `dokobot read --local` 替代。
 4. **🚫 将 BB Browser site CLI 仅当作「备用方案」** → 当目标平台有 Site Adapter 时，`bb-browser site` 应**优先于** Hermes browser_* 工具，因为一条命令直接出 JSON 远比逐步 navigate→snapshot→click 高效。仅在无 adapter 或需要精细步骤控制时才降级到 Hermes browser_*。
 5. **误以为引擎会自动降级** → `web_search` 的 Brave 超限/报错只是返回 `success: false` JSON，引擎不做 provider 切换或 dokobot 自动调用。降级是 LLM Agent 的主动行为，不是自动机制。
-6. **🚫 web_search 失败后直接调浏览器工具（`browser_navigate` / `browser_cdp` 等）** → **这是最严重的违规**。信息获取路径和浏览器自动化路径是两条独立闭环，永不相交。失败后只能降级 `dokobot search --local` → `dokobot search`（远程），绝不能跨越到浏览器工具。
+6. **🚫 web_search 失败后直接调浏览器工具（`browser_navigate` / `browser_cdp` 等）** → **这是最严重的违规**。信息获取路径和浏览器自动化路径是两条独立闭环，永不相交。失败后只能降级 `dokobot read 'https://www.google.com/search?q=...' --local`（dokobot search 无 --local flag），绝不能跨越到浏览器工具。
 7. **SPA 页面搜索 vs 详情页差异**：部分 SPA 平台（如小红书）的搜索列表页可以被 dokobot 部分渲染（标题/作者/互动数据），但单条帖子详情页完全依赖 JS 动态渲染 → dokobot 抓取时会跳转到首页。遇到此类场景，优先从搜索列表页提取信息，不要反复尝试打开详情页。
 8. **search-only provider 的正确用法**：当前环境 `web.backend = brave-free`（search-only）。`web_search` 用于发现 URL，然后用 `dokobot read --local` 读取内容。**不要在这之间插入 `web_extract`**——它永远失败。如果将来配置了 `web.extract_backend: firecrawl`，再恢复用 `web_extract`。
 9. **🚫 误以为 BB Browser 有 MCP Server** → BB Browser v0.13.3 已移除 `--mcp` flag（README 文档过时未同步）。只能用 CLI 模式：`terminal("bb-browser ...")`。不要尝试配置 Hermes MCP 连接 BB Browser。详见 `references/bb-browser-integration.md`。
 10. **BB Browser daemon "No page target found"** → daemon 刚启动时 Chrome 实例无 tab。先用 Hermes `browser_navigate` 打开目标页面（通过 BROWSER_CDP_URL 直连 daemon 的 Chrome），之后 site 命令自动复用 tab。不要反复重试 bb-browser open —— daemon 的 tab 管理由 browser_navigate 更可靠地完成。
 11. **BB Browser daemon uptime=0s 但 CDP 可达** → daemon 以 on-demand 方式管理 Chrome，uptime 为 0s 是正常的（资源优化）。只要 `curl http://127.0.0.1:9222/json/version` 有响应且 BROWSER_CDP_URL 已配置，browser_* 工具即可正常工作。
+12. **🚫 `mcp_qmd_query` 不是搜索引擎** → `mcp_qmd_query` 搜索的是**本地 Obsidian 知识库**（笔记/文档），不是互联网。查询 Cursor 配置、技术教程、开源项目等**外部信息**时，必须用 `terminal("dokobot read --local 'https://www.google.com/search?q=...'")` 或 `web_search`（若环境支持）。`mcp_qmd_query` 仅适用于查找用户自己的笔记（如 "Vertex Monitor 架构"、"上次讨论过的部署方案"）。混淆这两者会导致「搜索了个寂寞」——本地笔记里当然没有外部技术文档。
+13. **🚫 使用 `dokobot search --local` 做降级搜索** → **Dokobot CLI v2.11.0 的 `search` 子命令不支持 `--local` flag**（仅 `read` 子命令有）。执行 `dokobot search 'xxx' --local` 会报 `error: unknown option '--local'`。正确降级方式：`dokobot read 'https://www.google.com/search?q=搜索关键词' --local`，从 Google 搜索结果页提取 URL 列表，再逐个 `dokobot read '<URL>' --local` 抓取全文。如果 dokobot 配置了 API key，也可以用 `dokobot search 'xxx'`（远程模式，无需 `--local`）。
 
 > **与 SOUL.md 的关系**：SOUL.md 不再定义具体规则，仅做强制委托——"工具选择必须严格遵守 tool-selection-strategy 和 bb-browser Skill"。本 Skill 是工具选择策略的**唯一权威来源**。此前 SOUL.md 中的具体铁律曾因未同步而过时（声称 web_extract 可用、声称 BB Browser MCP 优先），教训：SOUL.md 不应镜像 Skill 内容，只应做纯引用。

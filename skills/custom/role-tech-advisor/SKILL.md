@@ -28,6 +28,7 @@ metadata:
 - Docker/CI/CD、自动化脚本、定时任务
 - 飞书/Lark 生态集成、机器人开发、API 对接
 - Vibe Coding 全流程：上下文工程→任务规划→Agent 驱动开发→质量把控
+- Cursor IDE 疑难排障——C++ 测试环境完整指南见 `references/cursor-cpp-testing-setup.md`，覆盖：微软 cpptools 封锁 / Anysphere clangd 替代 / TestMate 适配器 / **CTest 裸二进制陷阱**（最易忽略） / CMake FetchContent 拉 GTest / **LibTorch `c10::optional` vs `std::optional` 头文件顺序冲突** / **项目级 `.vscode/settings.json` 通配符 glob（优于写死目录名）** / **`.gitignore` 拦截 `.vscode/` 陷阱** / 并行构建竞态（`file too short`） / `measurementConfig.cmake.in` 丢失 / `add_subdirectory(tests)` 二进制路径偏移 / 模型资产 `study/` 相对路径部署约定。**触发条件**：用户问 Cursor 中 C++ 测试不工作、Testing 面板不显示、C/C++ DevTools 缺失、LibTorch + GTest 编译报错 `optional` 歧义、Testing 面板配置不生效、构建目录名变化后测试消失。
 
 ### AI 技术
 - 大模型原理（Transformer/Attention/KVCache/上下文窗口）

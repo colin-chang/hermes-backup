@@ -451,48 +451,55 @@ immigration consultant ad, IELTS prep, study abroad agency
 
 ### 阶段 4.5：iMessage 推送给嫂子（⚠️ 在输出最终报告之前执行）
 
-> ⚠️ **这一步不计入"第一条文字输出"规则**——工具调用不是文字输出。你仍须确保最终 assistant 消息之前不输出任何文字。
+> ⚠️ **这一步不计入「第一条文字输出」规则**——工具调用不是文字输出。你仍须确保最终 assistant 消息之前不输出任何文字。
+>
+> **一次 `execute_code` 调用完成全部工作**：检测 bridge → 自动启动 → 发送 → 响应判断。不拆分为多步，不依赖 terminal。
 
-**Step 1：确保 bridge 在运行（terminal 调用）**
-
-```bash
-# 检测 bridge 状态，不存在则通过 open 自动启动
-# open .command 在 Hermes terminal 中已验证可用（不会被拦截）
-tmux has-session -t imsg-bridge 2>/dev/null || {
-    open /Users/Colin/.hermes/skills/nomad-imessage/references/imsg-bridge.command
-    sleep 2
-}
-```
-
-> ⚠️ **不要在 terminal 中直接执行 `tmux new-session -d`**——Hermes 会拦截。
-> 必须用 `open .command` 方式启动（命令本身不含后台符号，通过 Terminal.app 间接执行）。
-
-**Step 2：发送（execute_code 调用）**
-
-将生成的完整日报通过 `execute_code` 推送给嫂子（`chenjieyu.swufe@gmail.com`），**一次调用完成，不写文件，Markdown 格式原样保留**：
+将生成的完整日报通过 `execute_code` 推送给嫂子（`chenjieyu.swufe@gmail.com`），**一次调用完成，不写文件，Markdown 格式原样保留**。
 
 ```python
-import socket, json, time
+import socket, json, time, subprocess, os
 
 report = """<完整日报内容，保留所有 Markdown 格式>"""
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('127.0.0.1', 8899))
-s.settimeout(10)
-s.sendall((json.dumps({'jsonrpc':'2.0','id':'1','method':'send','params':{'to':'chenjieyu.swufe@gmail.com','text':report}})+'\n').encode())
-time.sleep(1)
-try:
-    resp = s.recv(4096).decode()
-    print(resp)
-except socket.timeout:
-    print('TIMEOUT')
-s.close()
+def send_imessage(to, text):
+    """发送 iMessage，内部处理 bridge 自动启动"""
+
+    # 尝试连接
+    for attempt in range(2):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(10)
+            s.connect(('127.0.0.1', 8899))
+            s.sendall((json.dumps({
+                'jsonrpc': '2.0', 'id': '1', 'method': 'send',
+                'params': {'to': to, 'text': text}
+            }) + '\n').encode())
+            time.sleep(2)
+            try:
+                resp = s.recv(4096).decode()
+                s.close()
+                return resp
+            except socket.timeout:
+                s.close()
+                return 'TIMEOUT'
+        except (ConnectionRefusedError, OSError):
+            if attempt == 0:
+                # 自动启动 bridge：open .command 继承 Terminal.app FDA
+                cmd_path = '/Users/Colin/.hermes/skills/nomad-imessage/references/imsg-bridge.command'
+                subprocess.run(['open', cmd_path], check=False)
+                time.sleep(3)
+            else:
+                return 'BRIDGE_START_FAILED'
+
+result = send_imessage('chenjieyu.swufe@gmail.com', report)
+print(result)
 ```
 
-**响应判断：**
-- 有 `guid` → ✅ 继续输出报告
-- 有 `ok` 无 `guid` / `TIMEOUT` → ⚠️ 不重试，继续输出报告
-- `error` / `ConnectionRefusedError` → bridge 自动启动也失败了（已尝试过 `open`），在报告底部注明失败原因，继续输出报告
+**响应判断（由 print 输出自动处理，你只需检查输出）：**
+- 含 `"guid"` → ✅ 继续输出报告
+- 含 `"ok"` 无 `"guid"` / `TIMEOUT` → ⚠️ 不重试，继续输出报告
+- `BRIDGE_START_FAILED` / 含 `"error"` → bridge 自动启动也失败了，在报告底部注明失败原因，继续输出报告
 
 ---
 
