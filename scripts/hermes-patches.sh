@@ -26,9 +26,19 @@
 #         Clarify 并发守护 / Session 串台去重 / 批量图片 Thread 路由）
 #
 #   版本感知：
-#     最后验证: 2026-05-28
-#     Hermes 版本: v2026.5.16-1195-g458a94e42
-#     验证方式: git show origin/main:<file> | grep "<check_pattern>"
+#     最后验证: 2026-05-30
+#     Hermes 版本: v2026.5.29-190-gaa32edcac (origin/main)
+#     验证方式: 双重验证（check_pattern + old_string match）
+#
+#   已验证（v2026.5.29 / origin:main=aa32edcac）：
+#     providers.py                          — ❌ 未合入，old_string ✅ 仍匹配
+#     doctor.py                             — ❌ 未合入，old_string ✅ 仍匹配
+#     model_switch.py (user providers)      — ❌ 未合入，old_string ✅ 仍匹配
+#     model_switch.py (custom_providers)    — ❌ 未合入，old_string ✅ 仍匹配
+#     cron/jobs.py                          — ❌ 未合入，old_string ✅ 仍匹配
+#     stream_consumer.py (commentary)       — ❌ 未合入，old_string ✅ 仍匹配
+#     base.py (ghost fence)                 — ❌ 未合入，old_string ✅ 仍匹配
+#     stream_consumer.py (fallback thread)  — ❌ 未合入，old_string ✅ 仍匹配
 #
 # 使用方法：
 #   ./hermes-patches.sh check   # 检查当前状态（默认）
