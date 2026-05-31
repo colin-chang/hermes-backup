@@ -488,7 +488,22 @@ def send_imessage(to, text):
                 # 自动启动 bridge：open .command 继承 Terminal.app FDA
                 cmd_path = '/Users/Colin/.hermes/skills/nomad-imessage/references/imsg-bridge.command'
                 subprocess.run(['open', cmd_path], check=False)
-                time.sleep(3)
+                # 轮询等待 bridge 就绪（open 异步 + Terminal.app 冷启动 ≥3s，固定 sleep 不够）
+                ready = False
+                for i in range(15):
+                    time.sleep(1)
+                    try:
+                        test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        test.settimeout(2)
+                        test.connect(('127.0.0.1', 8899))
+                        test.close()
+                        ready = True
+                        break
+                    except (ConnectionRefusedError, OSError):
+                        continue
+                if not ready:
+                    return 'BRIDGE_START_FAILED'
+                # bridge 已就绪，继续 attempt 1
             else:
                 return 'BRIDGE_START_FAILED'
 

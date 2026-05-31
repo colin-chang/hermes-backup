@@ -117,6 +117,7 @@ sessions:
 approvals:
   mode: smart                    # 默认 manual，智能审批低风险命令
   cron_mode: approve             # 定时任务自动批准
+  mcp_reload_confirm: true       # MCP 重载需确认
   destructive_slash_confirm: false
 
 # 定时任务

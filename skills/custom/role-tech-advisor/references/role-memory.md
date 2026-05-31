@@ -17,7 +17,7 @@
 - GitHub 就绪：14 文件清单，`.gitignore` 排除凭证/数据/缓存，`data/.gitkeep` 保目录
 - 前端模式详见 `references/frontend-dark-ui-patterns.md`
 
-### Mattermost 统一插件 (mattermost-enhancer)\n- 状态：✅ 全部完成（12 源码补丁已迁入插件，mattermost.py 零修改）\n- 插件位置：`~/.hermes/plugins/mattermost-enhancer/`\n- GitHub：`colin-chang/hermes-plugin-mattermost-enhancer`\n- 涵盖能力：\n  - DM 审批（交互卡片 + 回调服务器 + asyncio.Lock 防竞态）\n  - /model 模型切换（select 下拉 + session override + pending_model_notes）\n  - Channel → Thread 模型继承（pre_gateway_dispatch hook）\n  - /new 会话重置（确认卡片）\n  - Clarify 交互卡片渲染（按钮选项 + 「其他」文本输入）\n  - Thread root_id 解析（覆写 send/send_typing/send_local_file/send_url_as_file）\n  - MEDIA 文件缺失静默跳过\n  - **Runtime Footer 内联合并**（v2.2.0，2026-05-24）：流式模式下 footer 不再独立发帖，\n    检测 ` · ` 分隔符 → 编辑上一条 Bot 消息 → 水平线+斜体脚注
+### Mattermost 统一插件 (mattermost-enhancer)\n- 状态：✅ 全部完成（P1/P6 已从 shell patch 迁入插件 adapter override；shell patches 现为 5 个（P1-P5，旧 P2-P5/P7 重编号））\n- 插件位置：`~/.hermes/plugins/mattermost-enhancer/`\n- GitHub：`colin-chang/hermes-plugin-mattermost-enhancer`\n- 涵盖能力：\n  - DM 审批（交互卡片 + 回调服务器 + asyncio.Lock 防竞态）\n  - /model 模型切换（select 下拉 + session override + pending_model_notes）\n  - Channel → Thread 模型继承（pre_gateway_dispatch hook）\n  - /new 会话重置（确认卡片）\n  - Clarify 交互卡片渲染（按钮选项 + 「其他」文本输入）\n  - Thread root_id 解析（覆写 send/send_typing/send_local_file/send_url_as_file）\n  - MEDIA 文件缺失静默跳过\n  - **Runtime Footer 内联合并**（v2.2.0，2026-05-24）：流式模式下 footer 不再独立发帖，\n    检测 ` · ` 分隔符 → 编辑上一条 Bot 消息 → 水平线+斜体脚注
 
 ### Obsidian 混合云站
 - 状态：架构设计完成，等待 Phase 1 (Next.js 初始化)
