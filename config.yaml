@@ -12,9 +12,9 @@ custom_providers:
     models:
       google/gemini-3.1-flash-lite:       # $0.25  Multimodal
         context_length: 1050000
-      minimax/minimax-m2.7:               # $0.30
-        context_length: 204800
-      deepseek/deepseek-v4-pro:           # $0.44
+      minimax/minimax-m3:               # $0.30 Multimodal
+        context_length: 512000
+      deepseek/deepseek-v4-pro:           # $0.435
         context_length: 1000000
       bytedance/doubao-seed-2.0-pro:      # $0.45  Multimodal
         context_length: 256000
@@ -22,7 +22,7 @@ custom_providers:
         context_length: 200000
       moonshotai/kimi-k2.6:               # $0.95  Multimodal
         context_length: 262140
-      google/gemini-3.5-flash:           # $1.5
+      google/gemini-3.5-flash:           # $1.5 Multimodal
         context_length: 1050000
       openai/gpt-5.3-codex:               # $1.75  Multimodal
         context_length: 400000
@@ -76,13 +76,13 @@ auxiliary:
     model: google/gemini-3.1-flash-lite
   mcp:
     provider: custom:zenmux
-    model: minimax/minimax-m2.7
+    model: minimax/minimax-m3
   session_search:
     provider: custom:zenmux
-    model: minimax/minimax-m2.7
+    model: minimax/minimax-m3
   skills_hub:
     provider: custom:zenmux
-    model: minimax/minimax-m2.7
+    model: minimax/minimax-m3
   title_generation:
     provider: custom:zenmux
     model: google/gemini-3.1-flash-lite

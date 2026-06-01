@@ -125,12 +125,24 @@ dokobot read --local 'https://www.canada.ca/en/immigration-refugees-citizenship/
 
 > ⚠️ **dokobot `--local` 依赖本地 Chrome 实例**，Chrome 持续运行，dokobot 可靠可用。仍建议先做连通性检测以确认状态，但不必过度担心不可用。
 
-**第一步：连通性检测（必须执行，耗时仅 15s）**
+**第一步：连通性检测（必须执行，带重试，最多 3 次 × 30s = 90s）**
+
+> ⚠️ **冷启动防护**：Dokobot bridge 在长时间无活动后首次调用需 10-30 秒冷启动。以下检测脚本内置 3 次重试 + 30s 超时，确保 bridge 有足够时间从零启动。
+
 ```bash
-dokobot read --local 'https://www.reddit.com/r/ImmigrationCanada/' --screens 1 --timeout 15 2>&1 | head -5
+DOKO_OK=0
+for i in 1 2 3; do
+  result=$(dokobot read --local 'https://www.reddit.com/r/ImmigrationCanada/' --screens 1 --timeout 30 2>&1)
+  if [ -n "$result" ] && ! echo "$result" | grep -q "No local bridge" && ! echo "$result" | grep -q "Error"; then
+    DOKO_OK=1
+    break
+  fi
+  [ $i -lt 3 ] && sleep 5
+done
+[ $DOKO_OK -eq 1 ] && echo "DOKOBOT_READY" || echo "DOKOBOT_FAILED"
 ```
-- **成功**（返回页面内容）→ 继续用 dokobot 抓取所有平台
-- **失败**（任何错误，含 'No local bridge running'）→ 走 `web_search` 降级，不浪费等待时间
+- **成功**（输出 `DOKOBOT_READY`）→ 继续用 dokobot 抓取所有平台
+- **失败**（输出 `DOKOBOT_FAILED`）→ 走 `web_search` 降级，不浪费等待时间
 
 **第二步（dokobot 可用时）：逐平台抓取**
 

@@ -6,8 +6,6 @@
       "prompt": "",
       "skills": [],
       "skill": null,
-      "model": null,
-      "provider": null,
       "base_url": null,
       "script": "update-gitlens.sh",
       "no_agent": true,
@@ -20,7 +18,7 @@
       "schedule_display": "0 2 * * 0",
       "repeat": {
         "times": null,
-        "completed": 18
+        "completed": 19
       },
       "enabled": true,
       "state": "scheduled",
@@ -28,7 +26,7 @@
       "paused_reason": null,
       "created_at": "2026-05-16T02:26:59.754948+08:00",
       "next_run_at": "2026-06-07T02:00:00+08:00",
-      "last_run_at": "2026-05-31T02:00:51.233645+08:00",
+      "last_run_at": "2026-06-01T21:54:50.940012+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -64,15 +62,15 @@
       "schedule_display": "0 17 * * *",
       "repeat": {
         "times": null,
-        "completed": 25
+        "completed": 28
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:30:30.666366+08:00",
-      "next_run_at": "2026-06-01T17:00:00+08:00",
-      "last_run_at": "2026-05-31T17:03:25.032723+08:00",
+      "next_run_at": "2026-06-02T17:00:00+08:00",
+      "last_run_at": "2026-06-01T21:52:26.591709+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -95,8 +93,6 @@
       "prompt": "",
       "skills": [],
       "skill": null,
-      "model": null,
-      "provider": null,
       "base_url": null,
       "script": "hermes-weekly-cleanup.sh",
       "no_agent": true,
@@ -109,7 +105,7 @@
       "schedule_display": "0 3 * * 0",
       "repeat": {
         "times": null,
-        "completed": 5
+        "completed": 6
       },
       "enabled": true,
       "state": "scheduled",
@@ -117,7 +113,7 @@
       "paused_reason": null,
       "created_at": "2026-05-17T01:04:16.155230+08:00",
       "next_run_at": "2026-06-07T03:00:00+08:00",
-      "last_run_at": "2026-05-31T03:00:59.360807+08:00",
+      "last_run_at": "2026-06-01T21:54:29.100804+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -125,9 +121,8 @@
       "origin": null,
       "enabled_toolsets": null,
       "workdir": null,
-      "profile": null,
-      "toast_notifications": true
+      "profile": null
     }
   ],
-  "updated_at": "2026-05-31T17:03:25.034144+08:00"
+  "updated_at": "2026-06-01T21:54:50.940674+08:00"
 }

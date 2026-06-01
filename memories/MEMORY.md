@@ -8,4 +8,6 @@ YAML一律block style（`key:\n  subkey: value`），禁inline flow。适用于c
 §
 UI/UX或技术选型：先调研出评估报告 → 审阅 → 再动手改。不要直接实施未经审阅的变更。
 §
-iMessage bridge：已废弃 LaunchAgent（FDA链断裂）。bridge 路径：/Users/Colin/.hermes/skills/nomad-imessage/references/imsg-bridge.command。Cron prompt 已改为自包含 send 代码（内部 subprocess.run(['open', cmd_path]) 自动启动 bridge），不再依赖 LLM 分步执行 auto-start。
+iMessage bridge：已废弃 LaunchAgent（FDA链断裂）。bridge 路径：/Users/Colin/.hermes/skills/nomad-imessage/references/imsg-bridge.command。Cron prompt 已改为自包含 send 代码（内部 subprocess.run(['open', cmd_path]) 自动启动 bridge），不再依赖 LL
+§
+「朕」是 Colin 在搞笑场景下的自称，Hermes 严禁使用。唯一例外：当 Colin 要求以他的身份代发消息时方可酌情使用。

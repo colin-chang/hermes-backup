@@ -79,7 +79,8 @@ metadata:
 - **Cron Job ID**: `2e081401e374`
 - **Prompt 文件**: `~/.hermes/scripts/immigration-monitor-prompt.md`
 - **角色绑定**: 加载 `role-canada-affairs` + `doko-research` + `doko-search` + `doko-summarize` + `dokobot` + `nomad-imessage`
-- **模型**: `bytedance/doubao-seed-2.0-pro`
+- **模型**: `bytedance/doubao-seed-2.0-pro` ✅（`minimax/minimax-m3` ❌ 不兼容，tool_turns=0）
+- **模型兼容性**: `references/cron-model-compatibility.md` — 实测记录，换模型前必读
 - **投递**: Mattermost 频道
 - **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [nomad-imessage](nomad-imessage)
 - **Cron toolsets**: `terminal, web, browser, vision, memory, session_search, code_execution`（注意是 toolset 名 `code_execution`，不是 tool 名 `execute_code`）
