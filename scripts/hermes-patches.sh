@@ -26,15 +26,15 @@
 #         Clarify 并发守护 / Session 串台去重 / 批量图片 Thread 路由）
 #
 #   版本感知：
-#     最后验证: 2026-05-30
-#     Hermes 版本: v2026.5.29-190-gaa32edcac (origin/main)
+#     最后验证: 2026-06-08
+#     Hermes 版本: v2026.6.5-181-gc98637723 (origin/main)
 #     验证方式: 双重验证（check_pattern + old_string match）
 #
-#   已验证（v2026.5.29 / origin:main=aa32edcac）：
+#   已验证（v2026.6.5 / origin:main=c98637723）：
 #     providers.py                          — ❌ 未合入，old_string ✅ 仍匹配
 #     doctor.py                             — ❌ 未合入，old_string ✅ 仍匹配
 #     model_switch.py (user providers)      — ❌ 未合入，old_string ✅ 仍匹配
-#     model_switch.py (custom_providers)    — ❌ 未合入，old_string ✅ 仍匹配
+#     model_switch.py (custom_providers)    — ⚠️ old_string 不匹配，已重写（上游重构为多行括号表达式）
 #     cron/jobs.py                          — ❌ 未合入，old_string ✅ 仍匹配
 #     stream_consumer.py (commentary)       — ❌ 未合入，old_string ✅ 仍匹配
 #     base.py (ghost fence)                 — ❌ 未合入，old_string ✅ 仍匹配
@@ -73,7 +73,7 @@ _patch_registry=(
     "hermes_cli/providers.py|Fix: custom: provider aggregator（修复「自定义 provider 显示全部模型」的问题）|startswith.*\"custom:\""
     "hermes_cli/doctor.py|Fix: custom: provider false warnings（修复「hermes doctor 误报模型不匹配」的问题）|startswith.*\"custom:\""
     "hermes_cli/model_switch.py|Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）|and not models_list"
-    "hermes_cli/model_switch.py|Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）|bool.*api_key.*and not grp\\[\"models\"\\]"
+    "hermes_cli/model_switch.py|Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）|curated list takes priority over live discovery"
     "cron/jobs.py|Fix: Chinese text garbled in cron jobs（修复「定时任务中文变乱码」的问题）|ensure_ascii=False"
     "gateway/stream_consumer.py|Fix: commentary fragmentation（修复「回复碎成很多条消息」的问题）|Accumulate commentary"
     "gateway/platforms/base.py|Fix: ghost fence in long code blocks（修复「长代码块出现幽灵空围栏」的问题）|reopening the fence would create"
@@ -244,19 +244,28 @@ PYEOF
         # 3b. Section 4: custom_providers
         _do_patch "hermes_cli/model_switch.py" \
             "Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）" \
-            'bool.*api_key.*and not grp["models"]' <<'PYEOF'
+            'curated list takes priority over live discovery' <<'PYEOF'
 import sys
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
 
-old = '''            should_probe = bool(api_url) and (bool(api_key) or not grp["models"])
+old = '''            should_probe = (
+                bool(api_url)
+                and (bool(api_key) or not grp["models"])
+                and grp.get("discover_models", True)
+            )
             if should_probe:'''
 
 new = '''            # Only run live discovery when the user has NOT supplied
             # a curated model list AND has credentials. A non-empty
             # curated list takes priority over live discovery.
-            should_probe = bool(api_url) and bool(api_key) and not grp["models"]
+            should_probe = (
+                bool(api_url)
+                and bool(api_key)
+                and not grp["models"]
+                and grp.get("discover_models", True)
+            )
             if should_probe:'''
 
 if old in content:
