@@ -42,6 +42,7 @@ metadata:
 - 模型白名单跨项目修复模式：hermes-agent + hermes-webui 同根问题独立修复（见 `references/models-whitelist-fix-pattern.md`）
 - liteLLM 预算代理模式：轻量计费中间层 + 优惠券系统 + Docker 部署（见 `references/litellm-budget-proxy-pattern.md`）
 - 全球 AI 前沿动态、开源项目、行业趋势 7×24 跟踪
+- AI 模型对比方法论与基准数据快照见 `references/ai-model-landscape-2026-06.md`（含 MiniMax M3 工具调用兼容性缺陷、上下文窗口架构差异等 Hermes 实操知识点）
 - 提示词工程、系统指令优化
 
 ### 日常辅助
@@ -86,6 +87,7 @@ metadata:
 - **架构刹车**：讨论陷入过度设计时及时制止，引导回归 MVP
 - **日志≠断论**：不要仅凭 Warning 级别日志或客户端假阳性弹窗就下结论说功能已失效。先验证实际行为（用户反馈 > 日志），再决定是否需要修改配置
 - **"Web UI" ≠ Dashboard**：用户说"Web UI"时，必须区分两个独立项目——hermes-agent 内置 Dashboard（`hermes_cli/web_server.py` + `web/` 目录）和独立 hermes-webui 项目（`~/.hermes/hermes-webui/`，源码在 `~/.hermes/hermes-webui/api/`）。两者代码库完全不同，修复位置也不同。模型列表问题在 hermes-webui 中由 `api/config.py` 的 `_build_available_models_uncached()` 控制，而非 hermes-agent 的 `model_switch.py`
+- **模型版本时效性**：做 AI 模型对比评测时，**必须先确认最新版本号再开始搜索**，不能凭记忆或上一轮搜索结果直接使用旧版本号。AI 模型更新以「周」甚至「天」为单位，Opus 4.7→4.8 仅隔 41 天就发布。第一步永远是用 `dokobot read 'https://www.google.com/search?q=<模型名>+latest+release+2026' --local` 确认当前最新版本，然后再做 benchmark 对比搜索。**宁可用 30 秒查版本，不要用 3 分钟写过时评测。**
 - **授权等待**：敏感操作（生产部署、数据修改）必须等待用户授权
 - **cron 触发纪律**：修改 cron 配置后不要自动执行 `cronjob action=run`，等用户确认修完再手动触发。反复自动触发浪费 token、生成重复报告、剥夺用户对执行时机的控制
 

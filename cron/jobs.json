@@ -18,17 +18,17 @@
       "schedule_display": "0 2 * * 0",
       "repeat": {
         "times": null,
-        "completed": 19
+        "completed": 20
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:26:59.754948+08:00",
-      "next_run_at": "2026-06-07T02:00:00+08:00",
-      "last_run_at": "2026-06-01T21:54:50.940012+08:00",
-      "last_status": "ok",
-      "last_error": null,
+      "next_run_at": "2026-06-14T02:00:00+08:00",
+      "last_run_at": "2026-06-07T02:00:56.239711+08:00",
+      "last_status": "error",
+      "last_error": "Script exited with code 18\nstderr:\ncurl: (18) Transferred a partial file",
       "last_delivery_error": null,
       "deliver": "mattermost:xsdt56rfjt8x3c9nzzjou3wayo",
       "origin": null,
@@ -62,15 +62,15 @@
       "schedule_display": "0 17 * * *",
       "repeat": {
         "times": null,
-        "completed": 28
+        "completed": 34
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-16T02:30:30.666366+08:00",
-      "next_run_at": "2026-06-02T17:00:00+08:00",
-      "last_run_at": "2026-06-01T21:52:26.591709+08:00",
+      "next_run_at": "2026-06-08T17:00:00+08:00",
+      "last_run_at": "2026-06-07T17:09:06.335288+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -105,15 +105,15 @@
       "schedule_display": "0 3 * * 0",
       "repeat": {
         "times": null,
-        "completed": 6
+        "completed": 7
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-05-17T01:04:16.155230+08:00",
-      "next_run_at": "2026-06-07T03:00:00+08:00",
-      "last_run_at": "2026-06-01T21:54:29.100804+08:00",
+      "next_run_at": "2026-06-14T03:00:00+08:00",
+      "last_run_at": "2026-06-07T03:00:07.953078+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -124,5 +124,5 @@
       "profile": null
     }
   ],
-  "updated_at": "2026-06-01T21:54:50.940674+08:00"
+  "updated_at": "2026-06-07T17:09:06.335734+08:00"
 }

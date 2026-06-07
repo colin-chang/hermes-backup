@@ -74,7 +74,26 @@ dokobot read '<目标URL>' --local
 dokobot read '<URL>' --local
 ```
 
-### 例外：有付费 extract provider 时
+### 终极降级：`delegate_task` 子 Agent（dokobot 也挂了时）
+
+当 `web_search` 和 `dokobot` **都不可用**时（例如 dokobot bridge "Frame with ID 0 is showing error page" 且 web_search 无结果/报错），最后手段是使用 `delegate_task` 派发调研任务给子 agent：
+
+```
+delegate_task(
+  goal="调研 X 主题...",
+  toolsets=["web", "terminal", "file"]
+)
+```
+
+**为什么可行？** 子 agent 运行在独立上下文中，拥有自己的工具集（可能包含 `web_search`、`web_extract` 等父 agent 不可用的工具），且其网络环境与父 agent 的 dokobot/Chrome 隔离。本次会话已验证：dokobot 全面故障时，delegate_task 子 agent 成功完成 9 次 API 调用并产出 587 行报告。
+
+**使用策略**：
+- 只在 `web_search` + `dokobot` 双故障时使用
+- `context` 参数传完整调研需求（子 agent 无会话记忆）
+- 必须指定 `toolsets=["web", "terminal", "file"]`，否则子 agent 可能无网络工具
+- 结果引用子 agent 产出的文件路径（如 `~/.hermes/workspace/<name>.md`）
+
+> ⚠️ 注意：delegate_task 是**同步阻塞**调用（父 agent 等待子 agent 完成），耗时可能 2-5 分钟。确认 web_search 和 dokobot 都失败后再走这条路，不要一上来就用。
 
 若后续配置了 `web.extract_backend: firecrawl`（或其他 extract-capable provider），则恢复标准流程：`web_search` → `web_extract` → 失败时才降级 `dokobot read`。但当前环境无此配置，本 Skill 据此优化。
 
@@ -177,9 +196,12 @@ BB Browser 也有 `open` / `snap` / `click` / `fill` 等浏览器自动化命令
 │   ├── 2. 判断 snippet 是否够用？
 │   │   ├── 够用 → 直接回答（不调用 extract/read）
 │   │   └── 不够 → 3. dokobot read --local 抓取目标 URL 全文
-│   └── web_search 失败？
-│       └── dokobot read 'https://www.google.com/search?q=关键词' --local
-│           （dokobot search 无 --local flag，用 Google 搜索 URL 替代）
+│   ├── web_search 失败？
+│   │   └── dokobot read 'https://www.google.com/search?q=关键词' --local
+│   │       （dokobot search 无 --local flag，用 Google 搜索 URL 替代）
+│   └── web_search + dokobot 双故障？
+│       └── delegate_task(goal="...", toolsets=["web","terminal","file"])
+│           （终极降级：子 agent 独立工具链，已验证可行）
 │
 └── 浏览器操作
     ├── 特定平台数据（36 平台 site adapter）？
@@ -214,5 +236,7 @@ BB Browser 也有 `open` / `snap` / `click` / `fill` 等浏览器自动化命令
 11. **BB Browser daemon uptime=0s 但 CDP 可达** → daemon 以 on-demand 方式管理 Chrome，uptime 为 0s 是正常的（资源优化）。只要 `curl http://127.0.0.1:9222/json/version` 有响应且 BROWSER_CDP_URL 已配置，browser_* 工具即可正常工作。
 12. **🚫 `mcp_qmd_query` 不是搜索引擎** → `mcp_qmd_query` 搜索的是**本地 Obsidian 知识库**（笔记/文档），不是互联网。查询 Cursor 配置、技术教程、开源项目等**外部信息**时，必须用 `terminal("dokobot read --local 'https://www.google.com/search?q=...'")` 或 `web_search`（若环境支持）。`mcp_qmd_query` 仅适用于查找用户自己的笔记（如 "Vertex Monitor 架构"、"上次讨论过的部署方案"）。混淆这两者会导致「搜索了个寂寞」——本地笔记里当然没有外部技术文档。
 13. **🚫 使用 `dokobot search --local` 做降级搜索** → **Dokobot CLI v2.11.0 的 `search` 子命令不支持 `--local` flag**（仅 `read` 子命令有）。执行 `dokobot search 'xxx' --local` 会报 `error: unknown option '--local'`。正确降级方式：`dokobot read 'https://www.google.com/search?q=搜索关键词' --local`，从 Google 搜索结果页提取 URL 列表，再逐个 `dokobot read '<URL>' --local` 抓取全文。如果 dokobot 配置了 API key，也可以用 `dokobot search 'xxx'`（远程模式，无需 `--local`）。
+14. **🚫 遇到 `Frame with ID 0 is showing error page` 后宣布 dokobot 永久不可用** → 这是 Chrome 自身网络栈故障（bridge/socket 都正常，但 Chrome 无法加载任何页面包括 example.com）。先诊断（手动在 Chrome 打开 example.com → 重启 Chrome → 验证恢复），不要一次失败就跳到 delegate_task。详见 `dokobot-operations` Skill「模式 D」。
+15. **🚫 一上来就用 delegate_task 做信息获取** → delegate_task 是终极降级（web_search + dokobot 双故障时），不是首选。子 agent 同步阻塞 2-5 分钟，token 开销大（本次 99K input + 11K output），且结果需事后引用文件路径。优先级链：web_search → dokobot → delegate_task，严格按序降级。
 
 > **与 SOUL.md 的关系**：SOUL.md 不再定义具体规则，仅做强制委托——"工具选择必须严格遵守 tool-selection-strategy 和 bb-browser Skill"。本 Skill 是工具选择策略的**唯一权威来源**。此前 SOUL.md 中的具体铁律曾因未同步而过时（声称 web_extract 可用、声称 BB Browser MCP 优先），教训：SOUL.md 不应镜像 Skill 内容，只应做纯引用。
