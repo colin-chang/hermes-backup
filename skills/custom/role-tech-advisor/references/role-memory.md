@@ -31,6 +31,12 @@
 
 ## 技术决策记录
 
+### Coze 平台双重身份（2026-06-08 用户纠错）
+- ⚠️ Coze 有两个完全不同的东西：**Coze SaaS（coze.cn）** 纯云端闭源 vs **Coze Studio（github.com/coze-dev/coze-studio）** 开源 Apache 2.0 + Docker 私有化
+- 说「Coze 支持私有化部署」是歧义表述 → 必须区分 SaaS 和开源项目
+- Coze Studio 是 Coze 核心引擎开源，不含 Agent Teams/技能商店/Vibe Coding/视频创作等商业版功能
+- 完整对比：`references/ai-platform-comparison-coze-dify-n8n.md`
+
 ### Hermes v0.14.0 升级 — Mattermost 插件兼容性审计与修复（2026-05-27）
 - 升级触发 6 个问题（P1-P6）：2 阻断 + 3 中 + 1 低
 - **P1**: 插件 `register_platform` 覆盖 bundled plugin 时丢失 `apply_yaml_config_fn` → config.yaml 配置静默失效

@@ -14,8 +14,14 @@ auth.json
 *.lock
 *.pid
 .clean_shutdown
-Processes.json
+processes.json
 .update_check
+.update_exit_code
+.install_method
+
+# 运行时空目录
+pairing/
+hooks/
 
 # 数据库（SQLite + WAL）
 state.db*
@@ -49,6 +55,14 @@ cron/output/
 
 # 二进制
 bin/
+
+# Desktop 安装产物
+node/
+bootstrap-cache/
+hermes-setup
+desktop-build-stamp.json
+
+# Agent 生成的临时工作产物
 
 # Skills — 忽略全部，仅保留 custom/
 skills/

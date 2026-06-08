@@ -13,6 +13,21 @@ metadata:
 
 **信息获取**和**浏览器自动化**是两条完全不同的任务路径，工具选择必须沿各自路径的优先级链执行。
 
+## Dokobot 技术原理（为什么它比 DOM 解析更可靠）
+
+Dokobot 不是传统 DOM 爬虫——它用 **像素级视觉提取（pixel-based visual extraction）**：
+
+> "Dokobot analyzes the rendered page at pixel level, not the DOM tree. It detects content boundaries from visual coordinates, making it immune to HTML/CSS changes."
+
+架构链路：Chrome 渲染页面 → Extension 滚动截图 → 像素坐标检测内容边界 → 仅提取正文文本。关键优势：
+
+- **视觉过滤 > DOM 遍历**：自动剔除导航/广告/侧边栏（这些区域在视觉坐标上有明确几何边界）
+- **免疫站点改版**：不依赖 HTML class/id 选择器，页面重构不影响提取
+- **99% token 减量**：典型网页 raw HTML ~24K tokens → 提取后 ~240 tokens
+- **不是 VLM/OCR**：像素分析做的是"智能裁剪"（判断哪些区域是正文），文本本身来自渲染后的页面，不需要 VLM 看图识字
+
+> 详见 `references/dokobot-architecture.md`
+
 ---
 
 ## ⚠️ Agent 行为 vs 引擎机制（关键概念）
@@ -218,6 +233,9 @@ BB Browser 也有 `open` / `snap` / `click` / `fill` 等浏览器自动化命令
 > `references/closed-platform-search.md` — 小红书/知乎/抖音等封闭平台的搜索模式：用搜索页提取帖子列表，放弃详情页。
 > `references/bb-browser-integration.md` — BB Browser 架构、MCP 移除状态、与 Hermes 内置工具的关系矩阵、36 平台 Site Adapter 速查。
 > `references/context-optimization.md` — 上下文消耗构成分析、各工具集 token 开销估算、压缩机制与配置调优、诊断工作流。
+> `references/provider-quirks.md` — 各模型提供商与 Hermes 集成的已知坑和 Workaround（如 MiniMax M3 tool calling 截断问题）。
+> `references/dokobot-competitive-landscape.md` — Dokobot 竞品全景图：护城河分析、分层对比、替代方案结论。当用户询问是否有更便宜/更好的替代品时参考。
+> `references/dokobot-architecture.md` — Dokobot 像素级视觉提取架构详解：官方定义、token 减量数据、与 DOM 解析和 browser_vision 的对比矩阵。当需要理解 dokobot 技术原理时参考。
 
 ---
 
