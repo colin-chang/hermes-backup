@@ -45,6 +45,9 @@ REMOTE_VSCODE_DIR="/home/colin/.vscode-server/extensions"
 TAGS_URL="https://github.com/AliverAnme/Rebuild-gitlens/tags"
 REPO_DOWNLOAD_BASE="https://github.com/AliverAnme/Rebuild-gitlens/releases/download"
 
+# ── curl 重试配置（应对 GitHub 下载不稳）─────────────────────────────────────
+CURL_RETRY="--retry 2 --retry-delay 10 --connect-timeout 15 --max-time 30"
+
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
 
 # 格式化输出（适配 no_agent 直投递）
@@ -70,12 +73,12 @@ is_valid_version() {
 # HEAD 检测 URL 是否存在；加超时和重定向次数限制
 url_exists() {
     local url="$1"
-    curl -fsIL --max-time 15 --max-redirs 5 "$url" >/dev/null 2>&1
+    curl -fsIL $CURL_RETRY --max-redirs 5 "$url" >/dev/null 2>&1
 }
 
 # ── 1. 获取最新版本 ──────────────────────────────────────────────────────────
 RAW_LATEST_TAG=$(
-    curl -fsSL "$TAGS_URL" \
+    curl -fsSL $CURL_RETRY "$TAGS_URL" \
     | sed -n 's#.*href="/AliverAnme/Rebuild-gitlens/releases/tag/\([^"]*\)".*#\1#p' \
     | head -n 1 \
     | tr -d '[:space:]'
@@ -117,16 +120,27 @@ CURRENT_VERSION=$(echo "$CURRENT_DIR" | sed 's/.*gitlens-//')
 REMOTE_CHECK=$(ssh "$REMOTE_HOST" "[ -d $REMOTE_VSCODE_DIR/eamodio.gitlens-$LATEST_VERSION ] && echo 'yes' || echo 'no'" 2>/dev/null || echo "no")
 
 # ── 6. 判断是否需要更新 ─────────────────────────────────────────────────────
-if [ "${CURRENT_VERSION:-}" == "$LATEST_VERSION" ] && [ "$REMOTE_CHECK" == "yes" ]; then
-    report "$LATEST_VERSION" "已是最新" "无"
+LOCAL_NEEDS_UPDATE=true
+REMOTE_NEEDS_SYNC=true
+
+if [ "${CURRENT_VERSION:-}" == "$LATEST_VERSION" ]; then
+    LOCAL_NEEDS_UPDATE=false
+fi
+if [ "$REMOTE_CHECK" == "yes" ]; then
+    REMOTE_NEEDS_SYNC=false
+fi
+
+if [ "$LOCAL_NEEDS_UPDATE" == "false" ] && [ "$REMOTE_NEEDS_SYNC" == "false" ]; then
+    report "$LATEST_VERSION" "已是最新" "本地+远程均已为最新"
     exit 0
 fi
 
-# ── 7. 下载 VSIX ─────────────────────────────────────────────────────────────
+# ── 7. 下载 VSIX（仅在本地需要更新时）────────────────────────────────────────
+if [ "$LOCAL_NEEDS_UPDATE" == "true" ]; then
 TMP_FILE="/tmp/$FILE_NAME"
 trap 'rm -f "$TMP_FILE"' EXIT
 
-if ! curl -fL -s "$DOWNLOAD_URL" -o "$TMP_FILE"; then
+if ! curl -fL -s $CURL_RETRY "$DOWNLOAD_URL" -o "$TMP_FILE"; then
     report "$LATEST_VERSION" "更新失败" "下载失败: $DOWNLOAD_URL"
     exit 1
 fi
@@ -136,8 +150,10 @@ if ! /usr/local/bin/code --install-extension "$TMP_FILE" --force; then
     report "$LATEST_VERSION" "更新失败" "VS Code 本地安装失败"
     exit 1
 fi
+fi  # LOCAL_NEEDS_UPDATE
 
-# ── 9. 同步到远程 ────────────────────────────────────────────────────────────
+# ── 9. 同步到远程（仅在远程需要时）───────────────────────────────────────────
+if [ "$REMOTE_NEEDS_SYNC" == "true" ]; then
 sync_to_remote() {
     local LOCAL_SRC=$1
     local REMOTE_DEST=$2
@@ -162,9 +178,26 @@ sync_to_remote() {
 }
 
 sync_to_remote "$LOCAL_VSCODE_DIR" "$REMOTE_VSCODE_DIR"
+fi  # REMOTE_NEEDS_SYNC
 
-# ── 10. 清理旧版本（本地 + 远程 2 个目录）───────────────────────────────────
-find "$LOCAL_VSCODE_DIR" -maxdepth 1 -name "eamodio.gitlens-*" ! -name "eamodio.gitlens-$LATEST_VERSION" -exec rm -rf {} + || true
-ssh "$REMOTE_HOST" "find $REMOTE_VSCODE_DIR -maxdepth 1 -name 'eamodio.gitlens-*' ! -name 'eamodio.gitlens-$LATEST_VERSION' -exec rm -rf {} +" || true
+# ── 10. 清理旧版本（仅在本次有更新时执行）───────────────────────────────────
+if [ "$LOCAL_NEEDS_UPDATE" == "true" ] || [ "$REMOTE_NEEDS_SYNC" == "true" ]; then
+    find "$LOCAL_VSCODE_DIR" -maxdepth 1 -name "eamodio.gitlens-*" ! -name "eamodio.gitlens-$LATEST_VERSION" -exec rm -rf {} + || true
+    ssh "$REMOTE_HOST" "find $REMOTE_VSCODE_DIR -maxdepth 1 -name 'eamodio.gitlens-*' ! -name 'eamodio.gitlens-$LATEST_VERSION' -exec rm -rf {} +" || true
+fi
 
-report "$LATEST_VERSION" "已更新至新版本" "已同步 2 个环境 (VS Code 本地 + 远程)"
+# ── 11. 输出最终报告 ─────────────────────────────────────────────────────────
+UPDATED_PARTS=""
+if [ "$LOCAL_NEEDS_UPDATE" == "true" ]; then
+    UPDATED_PARTS="本地 VS Code"
+fi
+if [ "$REMOTE_NEEDS_SYNC" == "true" ]; then
+    [ -n "$UPDATED_PARTS" ] && UPDATED_PARTS="$UPDATED_PARTS + "
+    UPDATED_PARTS="${UPDATED_PARTS}远程 orb"
+fi
+
+if [ -n "$UPDATED_PARTS" ]; then
+    report "$LATEST_VERSION" "已更新至新版本" "更新范围: $UPDATED_PARTS"
+else
+    report "$LATEST_VERSION" "已是最新" "无需更新"
+fi

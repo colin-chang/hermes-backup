@@ -34,7 +34,10 @@ This skill provides structured access to all seven ZenMux Management API endpoin
 
 - User asks about ZenMux usage, quota, balance, or billing
 - User wants to see cost/trends or model rankings
+- User wants to discover available models, compare pricing, or check model capabilities across providers
 - **Don't use for**: ZenMux docs, account setup, top-up instructions, or troubleshooting (those are separate domains)
+
+> **Model discovery/pricing reference:** `references/model-discovery.md` — how to query ZenMux's public models page (JSON-LD extraction) and Anthropic endpoint for model listings, without the Management API.
 
 ## Hermes Environment Setup
 

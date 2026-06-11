@@ -7,40 +7,38 @@
 #   当 hermes-agent 上游版本更新后，本地修改会被覆盖，
 #   此脚本用于一键还原以下 patch。
 #
-#   活跃 patch（当前 9 个）：
-#     1.  hermes_cli/providers.py           — 自定义 provider (custom:*) 聚合器识别
-#     2.  hermes_cli/doctor.py              — 自定义 provider vendor-prefix 假阳性修复
-#     3.  hermes_cli/model_switch.py        — config 白名单优先于线上拉取（user providers）
-#     4.  hermes_cli/model_switch.py        — 同上（custom_providers）
-#     5.  cron/jobs.py                      — Cron job 中文存储修复
-#     6.  gateway/stream_consumer.py        — P50: 评论→正文合并，防止消息碎片化
-#     7.  gateway/platforms/base.py         — P53: truncate_message 幽灵代码围栏修复
-#     8.  gateway/stream_consumer.py        — P55: fallback send 保留 Thread 路由
-#     9.  run_agent.py                      — P59: MiniMax M3模型 max_completion_tokens 修复
+#   活跃 patch（当前 7 个）：
+#     1.  hermes_cli/model_switch.py        — config 白名单优先于线上拉取（user providers）
+#     2.  hermes_cli/model_switch.py        — 同上（custom_providers）
+#     3.  cron/jobs.py                      — Cron job 中文存储修复
+#     4.  gateway/stream_consumer.py        — P50: 评论→正文合并，防止消息碎片化
+#     5.  gateway/platforms/base.py         — P53: truncate_message 幽灵代码围栏修复
+#     6.  gateway/stream_consumer.py        — P55: fallback send 保留 Thread 路由
+#     7.  utils.py                          — P59: MiniMax max_completion_tokens 修复（model_forces_max_completion_tokens）
 #
 #   已消除（上游已合入或不再需要）：
 #     ✅ gateway/config.py             — 上游已合入（gateway_restart_notification）
 #     ✅ utils.py                      — 上游已合入（yaml_rt.allow_unicode = True）
 #     ✅ MEDIA 正则收紧                 — 上游代码重构，不再需要单独 patch
+#     ✅ providers.py (is_aggregator)  — 上游已合入（normalize_provider + startswith("custom:")）
+#     ✅ doctor.py (vendor-prefix)     — 上游已合入（provider_accepts_vendor_slug 白名单）
 #     ⚠️  Mattermost 专属修复           — 已迁移至 mattermost-enhancer 插件脚本
-#        （DM 审批 user_id / 工具进度 Thread 路由 / Clarify Session 分裂 /
-#         Clarify 并发守护 / Session 串台去重 / 批量图片 Thread 路由）
 #
 #   版本感知：
-#     最后验证: 2026-06-08
-#     Hermes 版本: v2026.6.5-181-gc98637723 (origin/main)
+#     最后验证: 2026-06-11
+#     Hermes 版本: v2026.6.5-617-g955fa4006 (origin/main)
 #     验证方式: 双重验证（check_pattern + old_string match）
 #
-#   已验证（v2026.6.5 / origin:main=c98637723）：
-#     providers.py                          — ❌ 未合入，old_string ✅ 仍匹配
-#     doctor.py                             — ❌ 未合入，old_string ✅ 仍匹配
+#   已验证（v2026.6.5-617 / origin:main=955fa4006）：
+#     providers.py                          — ✅ 上游已合入，移除
+#     doctor.py                             — ✅ 上游已合入，移除
 #     model_switch.py (user providers)      — ❌ 未合入，old_string ✅ 仍匹配
-#     model_switch.py (custom_providers)    — ⚠️ old_string 不匹配，已重写（上游重构为多行括号表达式）
+#     model_switch.py (custom_providers)    — ❌ 未合入，old_string ✅ 仍匹配
 #     cron/jobs.py                          — ❌ 未合入，old_string ✅ 仍匹配
 #     stream_consumer.py (commentary)       — ❌ 未合入，old_string ✅ 仍匹配
 #     base.py (ghost fence)                 — ❌ 未合入，old_string ✅ 仍匹配
 #     stream_consumer.py (fallback thread)  — ❌ 未合入，old_string ✅ 仍匹配
-#     run_agent.py (minimax tokens)         — ❌ 未合入，old_string ✅ 仍匹配
+#     utils.py (minimax tokens)             — ❌ 未合入，old_string ❌ 已重写（上游重构为 model_forces_max_completion_tokens 委托）
 #
 # 使用方法：
 #   ./hermes-patches.sh check   # 检查当前状态（默认）
@@ -72,15 +70,13 @@ error()  { echo -e "${RED}[ERROR]${NC} $1"; }
 # ═══════════════════════════════════════════════════════════════════════════
 
 _patch_registry=(
-    "hermes_cli/providers.py|Fix: custom: provider aggregator（修复「自定义 provider 显示全部模型」的问题）|startswith.*\"custom:\""
-    "hermes_cli/doctor.py|Fix: custom: provider false warnings（修复「hermes doctor 误报模型不匹配」的问题）|startswith.*\"custom:\""
     "hermes_cli/model_switch.py|Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）|and not models_list"
     "hermes_cli/model_switch.py|Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）|curated list takes priority over live discovery"
     "cron/jobs.py|Fix: Chinese text garbled in cron jobs（修复「定时任务中文变乱码」的问题）|ensure_ascii=False"
     "gateway/stream_consumer.py|Fix: commentary fragmentation（修复「回复碎成很多条消息」的问题）|Accumulate commentary"
     "gateway/platforms/base.py|Fix: ghost fence in long code blocks（修复「长代码块出现幽灵空围栏」的问题）|reopening the fence would create"
-    "gateway/stream_consumer.py|Fix: fallback send loses thread routing（修复「fallback 发送时 Thread 路由丢失」的问题）|ML:content=chunk,\n.*reply_to=self._initial_reply_to_id"
-    "run_agent.py|Fix: MiniMax max_completion_tokens（修复「MiniMax 模型参数错误」的问题）|model_lower.startswith.*minimax"
+    "gateway/stream_consumer.py|Fix: fallback send loses thread routing（修复「fallback 发送时 Thread 路由丢失」的问题）|ML:content=chunk,\\n.*reply_to=self._initial_reply_to_id"
+    "utils.py|Fix: MiniMax max_completion_tokens（修复「MiniMax 模型参数错误」的问题）|m.startswith.*minimax"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -134,71 +130,14 @@ sys.exit(0 if re.search('$ml_pattern', content) else 1)
 apply_all() {
     info "Applying Hermes core patches...（正在安装 Hermes 核心补丁）"
 
-    # ── 1. providers.py ───────────────────────────────────────────────────
-    _do_patch "hermes_cli/providers.py" \
-        "Fix: custom: provider aggregator（修复「自定义 provider 显示全部模型」的问题）" \
-        'startswith.*"custom:"' <<'PYEOF'
-import sys
-file_path = sys.argv[1]
-with open(file_path, 'r') as f:
-    content = f.read()
-
-old = '''def is_aggregator(provider: str) -> bool:
-    """Return True when the provider is a multi-model aggregator."""
-    pdef = get_provider(provider)'''
-
-new = '''def is_aggregator(provider: str) -> bool:
-    """Return True when the provider is a multi-model aggregator."""
-    # Custom-named providers (e.g. "custom:zenmux") are always aggregators —
-    # they are user-defined endpoints that typically proxy multiple vendors.
-    if provider and provider.startswith("custom:"):
-        return True
-    pdef = get_provider(provider)'''
-
-if old in content:
-    content = content.replace(old, new)
-    with open(file_path, 'w') as f:
-        f.write(content)
-    print("APPLIED")
-else:
-    print("SKIP")
-PYEOF
-
-    # ── 2. doctor.py ──────────────────────────────────────────────────────
-    _do_patch "hermes_cli/doctor.py" \
-        "Fix: custom: provider false warnings（修复「hermes doctor 误报模型不匹配」的问题）" \
-        'startswith.*"custom:"' <<'PYEOF'
-import sys
-file_path = sys.argv[1]
-with open(file_path, 'r') as f:
-    content = f.read()
-
-old = '''                and provider_for_policy not in providers_accepting_vendor_slugs
-            ):'''
-
-new = '''                # Custom-named providers (e.g. "custom:zenmux") are aggregators
-                # that accept vendor-prefixed model slugs, just like "custom".
-                and provider_for_policy not in providers_accepting_vendor_slugs
-                and not provider_for_policy.startswith("custom:")
-            ):'''
-
-if old in content:
-    content = content.replace(old, new)
-    with open(file_path, 'w') as f:
-        f.write(content)
-    print("APPLIED")
-else:
-    print("SKIP")
-PYEOF
-
-    # ── 3. model_switch.py (两处) ─────────────────────────────────────────
+    # ── 1. model_switch.py (两处) ─────────────────────────────────────────
     local sw_file="${AGENT_DIR}/hermes_cli/model_switch.py"
     if [[ ! -f "$sw_file" ]]; then
         error "hermes_cli/model_switch.py 不存在，跳过"
     else
         local sw_ok=0
 
-        # 3a. Section 3: user providers
+        # 1a. user providers
         _do_patch "hermes_cli/model_switch.py" \
             "Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）" \
             'and not models_list' <<'PYEOF'
@@ -244,7 +183,7 @@ else:
 PYEOF
         [[ $? -eq 0 ]] && sw_ok=$((sw_ok + 1))
 
-        # 3b. Section 4: custom_providers
+        # 1b. custom_providers
         _do_patch "hermes_cli/model_switch.py" \
             "Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）" \
             'curated list takes priority over live discovery' <<'PYEOF'
@@ -284,7 +223,7 @@ PYEOF
         [[ $sw_ok -gt 0 ]] && ok "model_switch.py — both sections applied（两处均已修复）"
     fi
 
-    # ── 5. cron/jobs.py ───────────────────────────────────────────────────
+    # ── 2. cron/jobs.py ───────────────────────────────────────────────────
     _do_patch "cron/jobs.py" \
         "Fix: Chinese text garbled in cron jobs（修复「定时任务中文变乱码」的问题）" \
         'ensure_ascii=False' <<'PYEOF'
@@ -308,7 +247,7 @@ else:
     print("SKIP")
 PYEOF
 
-    # ── 6. P50: 评论→正文合并 ────────────────────────────────────────────────
+    # ── 3. P50: 评论→正文合并 ────────────────────────────────────────────────
     _do_patch "gateway/stream_consumer.py" \
         "Fix: commentary fragmentation（修复「回复碎成很多条消息」的问题）" \
         'Accumulate commentary' <<'PYEOF'
@@ -340,7 +279,7 @@ else:
     print("SKIP")
 PYEOF
 
-    # ── 7. P53: truncate_message 幽灵代码围栏 ─────────────────────────────────
+    # ── 4. P53: truncate_message 幽灵代码围栏 ─────────────────────────────────
     _do_patch "gateway/platforms/base.py" \
         "Fix: ghost fence in long code blocks（修复「长代码块出现幽灵空围栏」的问题）" \
         'reopening the fence would create' <<'PYEOF'
@@ -392,7 +331,7 @@ else:
     print("SKIP")
 PYEOF
 
-    # ── 8. P55: fallback send 保留 Thread 路由 ────────────────────────────
+    # ── 5. P55: fallback send 保留 Thread 路由 ────────────────────────────
     _do_patch "gateway/stream_consumer.py" \
         "Fix: fallback send loses thread routing（修复「fallback 发送时 Thread 路由丢失」的问题）" \
         'ML:content=chunk,\n.*reply_to=self._initial_reply_to_id' <<'PYEOF'
@@ -431,39 +370,33 @@ else:
     print("SKIP")
 PYEOF
 
-    # ── 9. P59: MiniMax max_completion_tokens ────────────────────────────
-    _do_patch "run_agent.py" \
+    # ── 6. P59: MiniMax max_completion_tokens ────────────────────────────
+    _do_patch "utils.py" \
         "Fix: MiniMax max_completion_tokens（修复「MiniMax 模型参数错误」的问题）" \
-        'model_lower.startswith.*minimax' <<'PYEOF'
+        'm.startswith.*minimax' <<'PYEOF'
 import sys
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
 
-old = '''        OpenAI's newer models (gpt-4o, o-series, gpt-5+) require
-        'max_completion_tokens'. Azure OpenAI also requires
-        'max_completion_tokens' for gpt-5.x models served via the
-        OpenAI-compatible endpoint. OpenRouter, local models, and older
-        OpenAI models use 'max_tokens'.
-        """
-        if self._is_direct_openai_url() or self._is_azure_openai_url() or self._is_github_copilot_url():
-            return {"max_completion_tokens": value}'''
+old = '''    return (
+        m.startswith("gpt-4o")
+        or m.startswith("gpt-4.1")
+        or m.startswith("gpt-5")
+        or m.startswith("o1")
+        or m.startswith("o3")
+        or m.startswith("o4")
+    )'''
 
-new = '''        OpenAI's newer models (gpt-4o, o-series, gpt-5+) require
-        'max_completion_tokens'. Azure OpenAI also requires
-        'max_completion_tokens' for gpt-5.x models served via the
-        OpenAI-compatible endpoint. MiniMax's OpenAI-compatible models
-        also reject the legacy key. OpenRouter, local models, and older
-        OpenAI models use 'max_tokens'.
-        """
-        model_lower = (self.model or "").lower()
-        if (
-            self._is_direct_openai_url()
-            or self._is_azure_openai_url()
-            or self._is_github_copilot_url()
-            or model_lower.startswith("minimax")
-        ):
-            return {"max_completion_tokens": value}'''
+new = '''    return (
+        m.startswith("gpt-4o")
+        or m.startswith("gpt-4.1")
+        or m.startswith("gpt-5")
+        or m.startswith("minimax")
+        or m.startswith("o1")
+        or m.startswith("o3")
+        or m.startswith("o4")
+    )'''
 
 if old in content:
     content = content.replace(old, new)

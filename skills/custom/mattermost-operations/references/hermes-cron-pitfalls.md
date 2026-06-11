@@ -117,7 +117,48 @@ s.close()
 
 ---
 
-## P45：Hermes 三层安全扫描架构
+## P46：`code --install-extension` 在 cron 环境中挂死
+
+**症状：** `no_agent=true` 的 shell 脚本调用 `/usr/local/bin/code --install-extension`，cron 执行 120s 超时。手动在终端跑能成功，但 cron 环境下一直挂。
+
+**根因：** macOS 上 `code` 命令本质是启动 `Visual Studio Code.app`（GUI 应用）。Cron 没有 GUI session（无 Aqua 域、无 WindowServer 连接），`code` 尝试启动 VS Code.app 或通过 IPC 连接运行中实例时会挂起等待，直到 cron 超时。
+
+**诊断确认：**
+```bash
+# 查看 cron 输出文件确认超时
+cat ~/.hermes/cron/output/<job_id>/<timestamp>.md
+# "Script timed out after 120s: /path/to/script.sh"
+
+# 手动跑脚本 → 成功，确认是 cron 环境差异
+bash /path/to/script.sh  # 终端中能跑完
+```
+
+**修复：** 绕过 `code --install-extension`，直接操作文件系统。VS Code 扩展本质是解压后的目录：
+```bash
+# 替换 code --install-extension xxx.vsix --force
+unzip -o "$VSIX_FILE" -d "$HOME/.vscode/extensions/eamodio.gitlens-$VERSION"
+```
+
+**适用场景：** 任何需要在 cron 中安装 VS Code 扩展的脚本。`code --install-extension` 只适合终端交互环境。
+
+---
+
+## P47：Cron 脚本超时诊断四步法
+
+**背景：** `no_agent=true` 脚本在 cron 中超时，需要系统化定位瓶颈。
+
+**诊断流程：**
+
+1. **查输出** — `cat ~/.hermes/cron/output/<job_id>/<timestamp>.md` 看 cron 记录的退出状态
+2. **读脚本** — 理解执行流程，标记每个可能慢的步骤（网络下载、SSH/SCP、GUI 调用、大文件操作）
+3. **复现并计时** — 在终端手动跑脚本，观察哪里卡住。用 `time` 命令包裹整个脚本
+4. **逐段拆解测试** — 将脚本中的关键步骤（SSH/scp/jq/curl）单独跑一遍，用 `time` 精确测量每步耗时，排除误判
+
+**常见陷阱：**
+- `scp -r` 传大目录 → 实际测试发现 18MB 只要 2.5 秒，通常不是瓶颈
+- `code --install-extension` → cron 无 GUI，大概率是凶手（见 P46）
+- `curl` 下载 → GitHub 瞬断可能导致 partial file（`curl: (18) Transferred a partial file`）
+- 不要把「最复杂」的步骤默认当瓶颈——往往是「看起来简单但对环境有要求的」那步
 
 Cron 任务经过三层独立的安全扫描，理解这个架构是排障的基础：
 

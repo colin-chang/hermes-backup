@@ -21,3 +21,5 @@ iMessage bridge：已废弃 LaunchAgent（FDA链断裂）。bridge 路径：/Use
 欧路词典：不喜欢（网络不稳定/Bug多/国外几乎不可用），仅因已有大量词汇积累和笔记而继续使用其词典查询功能。对 Anki 持开放态度（作为软件开发人员学新工具无难度），偏好免费开源跨平台工具，至少支持苹果全生态。
 §
 Colin 主力模型商：ZenMux（custom:zenmux，base_url: https://zenmux.ai/api/v1），主模型 deepseek/deepseek-v4-pro。MiniMax M3 仅用于辅助任务（mcp/session_search/skills_hub）。Claude Code 通过 ZenMux Anthropic endpoint（https://zenmux.ai/api/anthropic）路由，API Key 存在 macOS Keychain（service: zenmux-api-key, account: colin）。GUI 应用环境变量注入偏好：launchctl setenv + ~/.zshrc 持久化模式。
+§
+串台防范：Colin 明确纠正过——Mattermost 收到的消息和 TUI 会话是完全独立的对话流，不要默认把 Mattermost 消息当作上一个 TUI 会话的延续。他问"什么结果/为什么没回复"时，先检查 Mattermost 当前线程的实际上下文，而不是去翻 TUI 历史。他用过"又串台了吧"表示这是重复问题。

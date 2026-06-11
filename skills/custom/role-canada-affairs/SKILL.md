@@ -108,6 +108,7 @@ metadata:
 - **iMessage 推送**: 日报通过 `execute_code` 直接内联 socket 调用推送给嫂子（chenjieyu.swufe@gmail.com）。Markdown 格式原样保留，不写文件。详见 [nomad-imessage](nomad-imessage)
 - **Cron toolsets**: `terminal, web, browser, vision, memory, session_search, code_execution`（注意是 toolset 名 `code_execution`，不是 tool 名 `execute_code`）
 - **⚠️ 事故总结**：根因是 `cron/jobs.json` 中 `enabled_toolsets` 写了 tool 名 `execute_code` 而非 toolset 名 `code_execution`。`terminal`/`web`/`browser` 碰巧同名所以一直正常。详见 `references/cron-emoji-failure-postmortem.md`
+- **⚠️ 2026-06-11 事故**：Chrome 崩溃导致 Dokobot Bridge 宕机，Agent 跳过连通性检测直接走 web_search 降级，Brave Search 同时发生 SSL 错误。恢复方式：打开 `chrome://extensions` 触发扩展重载。详见 `references/cron-dokobot-failure-20260611.md`
 
 > ⚠️ 修改 prompt 文件后无需重启 cron，下次触发时自动加载最新版本。
 
