@@ -132,7 +132,7 @@ Mattermost（Docker PostgreSQL）与 Hermes `state.db` 是**两套独立存储**
 4. **导入路径验证**：`from hermes_plugins.platforms_mattermost.adapter import ...` 路径是否仍正确
 
 **审计清单模板**：[references/plugin-compatibility-audit.md](references/plugin-compatibility-audit.md)
-**最近一次完整审计**：[references/hermes-v2026.6.5-617-plugin-audit.md](references/hermes-v2026.6.5-617-plugin-audit.md)（2026-06-11，v2026.6.5-617）
+**最近一次完整审计**：[references/hermes-v2026.6.5-838-plugin-audit.md](references/hermes-v2026.6.5-838-plugin-audit.md)（2026-06-13，v2026.6.5-838）
 
 ### `register_platform` 参数完整性陷阱
 
