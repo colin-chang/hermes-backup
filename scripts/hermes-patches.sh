@@ -7,14 +7,16 @@
 #   当 hermes-agent 上游版本更新后，本地修改会被覆盖，
 #   此脚本用于一键还原以下 patch。
 #
-#   活跃 patch（当前 7 个）：
+#   活跃 patch（当前 9 个）：
 #     1.  hermes_cli/model_switch.py        — config 白名单优先于线上拉取（user providers）
 #     2.  hermes_cli/model_switch.py        — 同上（custom_providers）
 #     3.  cron/jobs.py                      — Cron job 中文存储修复
 #     4.  gateway/stream_consumer.py        — P50: 评论→正文合并，防止消息碎片化
 #     5.  gateway/platforms/base.py         — P53: truncate_message 幽灵代码围栏修复
 #     6.  gateway/stream_consumer.py        — P55: fallback send 保留 Thread 路由
-#     7.  utils.py                          — P59: MiniMax max_completion_tokens 修复（model_forces_max_completion_tokens）
+#     7.  utils.py                          — P59: MiniMax max_completion_tokens 修复
+#     8.  gateway/run.py                    — P60a: 中断跨线程 session source 覆盖修复
+#     9.  gateway/run.py                    — P60b: 中断跨线程 thread metadata 丢失修复
 #
 #   已消除（上游已合入或不再需要）：
 #     ✅ gateway/config.py             — 上游已合入（gateway_restart_notification）
@@ -25,11 +27,11 @@
 #     ⚠️  Mattermost 专属修复           — 已迁移至 mattermost-enhancer 插件脚本
 #
 #   版本感知：
-#     最后验证: 2026-06-11
-#     Hermes 版本: v2026.6.5-617-g955fa4006 (origin/main)
+#     最后验证: 2026-06-17
+#     Hermes 版本: v2026.6.5-1117-g17251e865 (origin/main)
 #     验证方式: 双重验证（check_pattern + old_string match）
 #
-#   已验证（v2026.6.5-617 / origin:main=955fa4006）：
+#   已验证（v2026.6.5-1117 / origin:main=17251e865）：
 #     providers.py                          — ✅ 上游已合入，移除
 #     doctor.py                             — ✅ 上游已合入，移除
 #     model_switch.py (user providers)      — ❌ 未合入，old_string ✅ 仍匹配
@@ -37,8 +39,10 @@
 #     cron/jobs.py                          — ❌ 未合入，old_string ✅ 仍匹配
 #     stream_consumer.py (commentary)       — ❌ 未合入，old_string ✅ 仍匹配
 #     base.py (ghost fence)                 — ❌ 未合入，old_string ✅ 仍匹配
-#     stream_consumer.py (fallback thread)  — ❌ 未合入，old_string ✅ 仍匹配
-#     utils.py (minimax tokens)             — ❌ 未合入，old_string ❌ 已重写（上游重构为 model_forces_max_completion_tokens 委托）
+#     stream_consumer.py (fallback thread)  — ❌ 未合入，old_string ✅ 已重写（上游改为 _metadata_for_send 包装）
+#     utils.py (minimax tokens)             — ❌ 未合入，old_string ✅ 仍匹配
+#     run.py (P60a session source)          — ❌ 未合入，old_string ✅ 仍匹配
+#     run.py (P60b thread metadata)         — ❌ 未合入，old_string ✅ 仍匹配
 #
 # 使用方法：
 #   ./hermes-patches.sh check   # 检查当前状态（默认）
@@ -77,6 +81,8 @@ _patch_registry=(
     "gateway/platforms/base.py|Fix: ghost fence in long code blocks（修复「长代码块出现幽灵空围栏」的问题）|reopening the fence would create"
     "gateway/stream_consumer.py|Fix: fallback send loses thread routing（修复「fallback 发送时 Thread 路由丢失」的问题）|ML:content=chunk,\\n.*reply_to=self._initial_reply_to_id"
     "utils.py|Fix: MiniMax max_completion_tokens（修复「MiniMax 模型参数错误」的问题）|m.startswith.*minimax"
+    "gateway/run.py|Fix: session source clobbered by cross-thread interrupt（修复「中断时 session source 被跨线程覆盖」的问题）|cross-thread routing"
+    "gateway/run.py|Fix: thread metadata lost after cross-thread interrupt（修复「中断后 thread metadata 丢失」的问题）|cross-thread interrupt"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -345,7 +351,7 @@ with open(file_path, 'r') as f:
 old = '''                result = await self.adapter.send(
                     chat_id=self.chat_id,
                     content=chunk,
-                    metadata=self.metadata,
+                    metadata=self._metadata_for_send(final=True),
                 )
                 if result.success:
                     break
@@ -355,7 +361,7 @@ new = '''                result = await self.adapter.send(
                     chat_id=self.chat_id,
                     content=chunk,
                     reply_to=self._initial_reply_to_id,
-                    metadata=self.metadata,
+                    metadata=self._metadata_for_send(final=True),
                 )
                 if result.success:
                     break
@@ -397,6 +403,77 @@ new = '''    return (
         or m.startswith("o3")
         or m.startswith("o4")
     )'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── 7. P60a: Session source clobbered by cross-thread interrupt ───────
+    _do_patch "gateway/run.py" \
+        "Fix: session source clobbered by cross-thread interrupt（修复「中断时 session source 被跨线程覆盖」的问题）" \
+        'cross-thread routing' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+old = '''        session_entry = self.session_store.get_or_create_session(source)
+        session_key = session_entry.session_key
+        self._cache_session_source(session_key, source)
+        if self._is_telegram_topic_lane(source):'''
+
+new = '''        session_entry = self.session_store.get_or_create_session(source)
+        session_key = session_entry.session_key
+        # Preserve original session source on resume — don't overwrite with
+        # interrupting event's metadata.  This prevents cross-thread routing
+        # when an inbound message from a different thread interrupts a running
+        # agent and causes the session to restart with wrong thread_id/message_id.
+        if not self._get_cached_session_source(session_key):
+            self._cache_session_source(session_key, source)
+        if self._is_telegram_topic_lane(source):'''
+
+if old in content:
+    content = content.replace(old, new)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print("APPLIED")
+else:
+    print("SKIP")
+PYEOF
+
+    # ── 8. P60b: Thread metadata lost after cross-thread interrupt ────────
+    _do_patch "gateway/run.py" \
+        "Fix: thread metadata lost after cross-thread interrupt（修复「中断后 thread metadata 丢失」的问题）" \
+        'cross-thread interrupt' <<'PYEOF'
+import sys
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+old = '''        _thread_metadata: Optional[Dict[str, Any]] = self._thread_metadata_for_source(source, event_message_id)
+
+        if _streaming_enabled:'''
+
+new = '''        _thread_metadata: Optional[Dict[str, Any]] = self._thread_metadata_for_source(source, event_message_id)
+
+        # On session resume after cross-thread interrupt, the current source
+        # may carry the interrupting message's metadata (thread_id=None on
+        # channel-level posts).  Fall back to the cached original session
+        # source so streamed responses route to the correct thread.
+        if _thread_metadata is None:
+            _cached_meta_source = self._get_cached_session_source(session_key)
+            if _cached_meta_source is not None:
+                _thread_metadata = self._thread_metadata_for_source(
+                    _cached_meta_source,
+                    event_message_id,
+                )
+
+        if _streaming_enabled:'''
 
 if old in content:
     content = content.replace(old, new)
