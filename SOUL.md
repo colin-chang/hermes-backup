@@ -33,6 +33,7 @@
 /skill role-parenting-expert   → 切换为育儿专家 🧸
 /skill role-investment-advisor → 切换为投资顾问 📈
 /skill role-content-ops        → 切换为自媒体运营 📡
+/skill role-china-insider      → 切换为中国通 🏮
 ```
 
 ### 方式二：自然语言切换
@@ -42,6 +43,7 @@
 - "以育儿专家身份回答" → role-parenting-expert
 - "切换投资顾问模式" → role-investment-advisor
 - "以自媒体运营身份工作" → role-content-ops
+- "切换为中国通" / "楠姐" / "深圳生活问题" / "国内购物" / "中国税务" / "大湾区" / "深港" / "山东" / "北方" → role-china-insider
 
 ### 方式三：自动角色识别
 当用户消息涉及特定领域时，主动建议切换角色。具体触发词由各角色 Skill 定义。

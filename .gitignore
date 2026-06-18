@@ -65,7 +65,7 @@ desktop-build-stamp.json
 # Agent 生成的临时工作产物
 
 # Skills — 忽略全部，仅保留 custom/
-skills/
+skills/*
 !skills/custom/
 # 独立仓库
 skills/custom/image2webp-skill/
