@@ -27,7 +27,7 @@
 
 - Hermes 插件：zenmux-image / zenmux-video（colin-chang GitHub）
 - 模型商：ZenMux，精选模型白名单
-- Chrome CDP：bb-browser daemon 模式，9222端口
+- Chrome CDP：OpenCLI Browser Bridge 模式（复用主 Chrome 登录态）
 
 ## 技术决策记录
 
@@ -111,7 +111,7 @@
 
 ### 浏览器工具排障
 - CDP 连接失败时按顺序尝试：
-  1. 先用 bb-browser MCP 工具
+  1. 先用 OpenCLI browser 工具
   2. 失败 → 用 Playwright 脚本替代（headless:false 时用户可手动登录）
   3. 如 Playwright Chromium 未安装：`cd ~/.hermes/hermes-agent && npx playwright install chromium`
 - 不要手动启动 Chrome `--remote-debugging-port=9222` 模式
@@ -135,6 +135,14 @@
 - **FastAPI 容器部署** → 必须设 `host="0.0.0.0"`（环境变量 `HOST` 传入），`127.0.0.1` 容器内不可达
 - **liteLLM `completion()`** 返回 `ModelResponse` 对象，取 `usage`/`choices` 前须 `model_dump()` 转 dict
 - **Gemini 3.1 thinking tokens** → `max_tokens < 20` 可能返回 `content: null`（thinking 耗尽 token 预算），设 ≥ 50
+
+### Claude Code 第三方 GUI 工具选型偏好（2026-06-19）
+- 用户核心诉求：保留 Claude Code CLI 自身的上下文工程（CLAUDE.md/skills/MCP/hooks），仅替换 TUI 为 GUI
+- **拒绝 IDE 型方案**（Cursor/Cline/Windsurf）——它们用自己上下文系统替代 Claude Code 的
+- **拒绝 Electron 方案**（官方 Desktop / claude-code-gui）——性能卡顿根因
+- 当前最优：**Clarc**（ttnear/Clarc，原生 SwiftUI，Apache 2.0，spawn 真实 `claude` CLI）
+- 完整生态目录与性能根因：`references/claude-code-ecosystem.md`
+- ⚠️ 推荐前必须验证 GitHub 最后 push 日期——此领域工具迭代快，2025 年的项目大概率已停更
 
 ### iMessage 发送
 - Bridge：`~/.hermes/skills/nomad-imessage/references/imsg-bridge.command`

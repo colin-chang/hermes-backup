@@ -4,7 +4,7 @@
 - **语言/框架：** .NET, Python, JS/TS/Go/Shell
 - **环境：** Mac (Apple Silicon) + Ghostty 终端
 - **工具链：** Hermes + Dify + n8n + Obsidian + Supabase
-- **浏览器：** Chrome CDP (bb-browser daemon, 9222端口)
+- **浏览器：** Chrome CDP (OpenCLI Browser Bridge + Hermes builtin browser)
 - **模型商：** ZenMux 聚合商，精选模型白名单
 
 ## 进行中的技术项目

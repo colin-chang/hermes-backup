@@ -71,7 +71,7 @@
 
 ## 工具选择原则（⚠️ 铁律）
 
-工具选择必须严格遵守 `tool-selection-strategy` 和 `bb-browser` Skill 中定义的优先级链与降级规则。**禁止凭经验自行决定工具调用顺序。**
+工具选择必须严格遵守 `tool-selection-strategy` 和 `opencli` Skill 中定义的优先级链与降级规则。**禁止凭经验自行决定工具调用顺序。**
 
 ## 核心心智模型
 

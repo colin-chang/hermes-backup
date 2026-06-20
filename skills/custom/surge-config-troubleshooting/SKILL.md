@@ -13,6 +13,7 @@ category: custom
 - Surge 下某个应用/域名无法正常访问，但换配置文件后正常
 - 两个配置都能科*学上网，但特定服务有差异
 - 用户要求对比分析 Surge 配置文件
+- **Mattermost Desktop 证书错误**（`ERR_CERT_COMMON_NAME_INVALID` / "证书与以前的证书不同"）→ [references/mattermost-cert-rotation-case.md](references/mattermost-cert-rotation-case.md)
 
 ## 排障流程
 
@@ -42,7 +43,14 @@ category: custom
 - 验证：对比 `[Proxy]` 区块 —— 直接声明 vs 订阅下载
 - 根因：VMess/Trojan 对 WebSocket 帧的封装/解封可能破坏帧边界；SOCKS5 纯 TCP 转发无此问题
 
-**假说 C: IP-ASN 规则 DNS 缓存污染**
+**假说 C-1: Surge DNS 虚拟 IP 绕过 IP-ASN 规则**
+
+- 表现：IP-ASN 规则看似应匹配，但实际未命中，流量走了非预期策略
+- 验证：对比 `dig +short <domain>`（系统解析）与 `dig +short <domain> @1.1.1.1`（外部 DNS）
+- 根因：Surge 可能将域名解析为内部虚拟 IP（如 `198.18.40.137`），该 IP 不属于目标 ASN → `IP-ASN` 规则无法匹配。典型场景：国内 DNS + Cloudflare 代理域名
+- 修复：在 `IP-ASN` 规则前添加显式 `DOMAIN-SUFFIX` 规则
+
+**假说 C-2: IP-ASN 规则 DNS 缓存污染**
 - 表现：Surge 请求查看器显示走代理，但实际连接走 DIRECT
 - 验证：注释掉 `IP-ASN,13335,DIRECT,no-resolve` → 重载 → 测试
 - 根因：`no-resolve` 虽跳过首次域名请求，但 DNS 缓存后的 IP 可能触发规则二次匹配

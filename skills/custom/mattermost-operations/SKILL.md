@@ -11,6 +11,7 @@ version: 4.3.0
 - 用户询问 Mattermost 相关问题（推送通知/配置/网络/容器/升级）
 - 用户询问 `hermes-plugin-mattermost-enhancer` 插件相关问题
 - Mattermost 移动端或桌面端异常
+- **Mattermost Desktop 证书错误**（`ERR_CERT_COMMON_NAME_INVALID` / "证书与以前的证书不同"）→ [references/certificate-errors.md](references/certificate-errors.md)
 - 服务器端日志分析
 - 容器管理（mm-app / mm-postgres）
 
@@ -164,6 +165,14 @@ enhancer.connect() → super().connect() [bundled]
 ```
 
 **审计时验证**：确认 enhancer 的 `connect()` 调用了 `super().connect()`，且 bundled 的 `connect()` → `_ws_loop()` → `self._ws_connect_and_listen()` 链条未断裂。若未来 bundled 将 `_ws_loop()` 改为直接调用 `_ws_connect_and_listen()` 而不通过 `self`，则 enhancer 的覆写会静默失效。
+
+## 桌面客户端证书错误
+
+Mattermost Desktop (macOS) 出现 `ERR_CERT_COMMON_NAME_INVALID` 或 "证书与以前的证书不同" 弹窗时，按 [references/certificate-errors.md](references/certificate-errors.md) 中的诊断清单排查。
+
+快速要点：
+- 通常由 **Cloudflare SSL 证书轮换 + Surge MITM 虚拟 IP 路由** 交互触发
+- 修复：Surge `[MITM]` 加 `skip-server-cert-verify = true` + DOMAIN-SUFFIX 直连规则 + 修正 Mattermost `SiteURL`
 
 ## 网络问题
 

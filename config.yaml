@@ -161,6 +161,7 @@ display:
   bell_on_complete: true
   show_cost: true
   background_process_notifications: all
+  busy_input_mode: steer
   runtime_footer:
     enabled: true
     fields:

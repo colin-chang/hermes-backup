@@ -54,31 +54,27 @@
 
 ---
 
-## 2. browser-configure.sh — 浏览器自动化方案配置入口
+## 2. browser-configure.sh — 浏览器方案配置入口
 
-**作用：** Hermes 通过 CDP（Chrome DevTools Protocol）操作 Chrome 浏览器。此脚本是三种浏览器接入方案的统一配置入口，负责 profile 拷贝、daemon 启动、端口发现，最终将 CDP URL 写入 `~/.hermes/.env`。
+**作用：** 验证和配置 Hermes 浏览器工具的后端。当前两种方案：
 
-**三种方案：**
+**两种方案：**
 
 | 方案 | 特点 | 适用场景 |
 |------|------|---------|
-| `bb-browser` ★默认推荐 | 独立 Chrome + daemon 管理 + 无授权弹窗 | 日常使用、批量/密集操作 |
-| `buildin-isolation` | 独立 Chrome + 手动启动 | 临时调试、需自定义 Chrome 参数 |
-| `buildin-inspect` | 复用主 Chrome + 共享登录态 | 偶尔轻量操作 |
+| `opencli` ★默认推荐 | Browser Bridge 扩展复用主 Chrome + 无授权弹窗 | 日常使用 |
+| `isolation` | 独立 Chrome + 手动启动 | 应急备用、需隔离环境 |
 
 **何时运行：**
-- 首次配置 Hermes 浏览器自动化时（必须执行一次）
-- 切换不同方案时
-- 主 Chrome 登录态变更后（`bb-browser` / `buildin-isolation` 需重新同步）
-- Chrome 重启后（`buildin-inspect` 需重新发现端口）
+- 首次配置时（验证 OpenCLI 连接）
+- 需要使用独立 Chrome 隔离环境时
 
 **使用：**
 ```bash
-~/.hermes/scripts/browser-configure.sh                    # 默认 bb-browser
-~/.hermes/scripts/browser-configure.sh bb-browser          # 显式指定
-~/.hermes/scripts/browser-configure.sh buildin-isolation   # 独立 Chrome
-~/.hermes/scripts/browser-configure.sh buildin-inspect     # 复用主 Chrome
-~/.hermes/scripts/browser-configure.sh --help              # 完整帮助
+~/.hermes/scripts/browser-configure.sh                    # 默认 opencli
+~/.hermes/scripts/browser-configure.sh opencli             # 显式验证
+~/.hermes/scripts/browser-configure.sh isolation           # 独立 Chrome
+~/.hermes/scripts/browser-configure.sh --help              # 帮助
 ```
 
 ---

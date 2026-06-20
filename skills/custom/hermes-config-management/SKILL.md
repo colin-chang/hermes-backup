@@ -154,6 +154,7 @@ git diff config.yaml  # 确认 diff 只包含预期变更
 - `references/minimax-m3-hermes-integration.md` — MiniMax M3 × Hermes 集成状态：Tool Calling 已知问题、PR #37152 追踪、临时 Workaround
 - `references/nodejs-path-conflict.md` — Node.js 版本冲突排障：Desktop 捆绑版 vs 系统版，NODE_MODULE_VERSION 不匹配，qmd MCP 修复流程
 - `references/hermes-mcp-node-troubleshooting.md` — MCP 崩溃日志定位 + Node.js ABI 不匹配诊断 + Hermes Desktop 捆绑 Node.js 行为
+- `references/busy-input-mode.md` — `display.busy_input_mode` 配置：interrupt/queue/steer 三种消息中断模式详解
 
 ## Patch 脚本维护
 

@@ -44,6 +44,7 @@ metadata:
 - 全球 AI 前沿动态、开源项目、行业趋势 7×24 跟踪
 - AI 模型对比方法论与基准数据快照见 `references/ai-model-landscape-2026-06.md`（含 MiniMax M3 工具调用兼容性缺陷、上下文窗口架构差异等 Hermes 实操知识点）
 - AI Agent 平台对比（Coze/Dify/n8n）见 `references/ai-platform-comparison-coze-dify-n8n.md`（⚠️ 说 Coze 支持私有化部署时必须区分 Coze SaaS 和 Coze Studio 开源项目，两者入口完全不同）
+- Claude Code 生态工具与第三方 GUI 外壳（官方 Desktop 性能根因 + 第三方 GUI 目录 + 选型框架）见 `references/claude-code-ecosystem.md`
 - Coze SaaS 独家功能 vs 开源替代方案对照表（Agent Teams / 技能商店 / Vibe Coding / 视频创作 / 跨端同步）见 `references/coze-saas-vs-opensource-alternatives.md`——逐项验证每个 Coze SaaS 卖点是否有免费可私有化部署的替代品
 - 提示词工程、系统指令优化
 
