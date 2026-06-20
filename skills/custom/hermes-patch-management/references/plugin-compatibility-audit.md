@@ -38,6 +38,34 @@ grep -A5 "async def <method_name>" ~/.hermes/hermes-agent/plugins/platforms/<pla
 - Parent added/removed a required parameter
 - Parent changed return type
 - Parent renamed the method
+- **Method split refactoring**: upstream splits a single method that accepted
+  a `method=` parameter into separate methods (e.g., `_api_post(method="PUT")`
+  → `_api_put()`). Plugin code calling the old signature with `method=` will
+  raise `TypeError` at runtime. Check with:
+  ```bash
+  # Find plugin calls passing method= to a parent method
+  grep -n 'method=' ~/.hermes/plugins/<plugin>/adapter.py
+  # Verify parent no longer accepts it
+  grep -A3 'def _api_post' ~/.hermes/hermes-agent/plugins/platforms/<platform>/adapter.py
+  ```
+- **Return type divergence**: both plugin and upstream define the same method
+  but with incompatible return types (e.g., plugin `_resolve_root_id() -> Optional[str]`
+  vs upstream `_resolve_root_id() -> str`). If upstream's new helper methods call
+  `self._resolve_root_id()` expecting `str`, a `None` return from the plugin's
+  override can cause downstream errors. Detect with:
+  ```bash
+  # Methods defined in BOTH plugin and parent
+  comm -12 \
+    <(grep -oP '(?<=async def )\w+' ~/.hermes/plugins/<plugin>/adapter.py | sort -u) \
+    <(grep -oP '(?<=async def )\w+' ~/.hermes/hermes-agent/plugins/platforms/<platform>/adapter.py | sort -u)
+  ```
+  Then compare return type annotations for each shared method.
+- **Parameter addition without propagation**: upstream adds a new parameter
+  (e.g., `metadata=None`) to a method that the plugin also overrides. If the
+  plugin's override doesn't include the new parameter, calls from upstream
+  code passing it will fail. Even if the plugin also overrides the *caller*
+  (so the parameter is never passed), the signatures have diverged and future
+  upstream changes could break the assumption.
 
 **Safe patterns**:
 - Plugin adds extra keyword args with defaults (e.g., `metadata=None`)
@@ -88,6 +116,22 @@ When a plugin completely overrides a parent method (not just wrapping with
 `send()`, bypassing new `_post_preserving_thread()` which adds broken-thread-root
 fallback. Not a breaking change, but a missed enhancement opportunity.
 
+**Additional case studies (mattermost-enhancer, v2026.6.19 audit)**:
+- `_update_bot_post()` calls `self._api_post(path, payload, method="PUT")` —
+  upstream split `_api_post` into `_api_post` + `_api_put`. The `method=` kwarg
+  raises `TypeError`. Currently dead code, but a latent crash if ever called.
+- `_resolve_root_id()` — plugin returns `Optional[str]` (with 5min cache), upstream
+  returns `str` (no cache). Upstream's new `_thread_root_for_send()` helper calls
+  `self._resolve_root_id()` expecting `str`. If the plugin's `None` return reaches
+  upstream code paths, it can cause silent thread-routing failures.
+- `_send_local_file()` / `_send_url_as_file()` — upstream added `metadata=None`
+  parameter; plugin override lacks it. Currently safe because the plugin also
+  overrides all callers, but signatures have diverged.
+- `_ws_connect_and_listen()` override — upstream added `_ws_loop()` reconnection
+  wrapper that calls `_ws_connect_and_listen()` in a loop with exponential backoff.
+  The plugin's override **automatically benefits** from this — no action needed.
+  This is a positive example of an override that composes well with upstream changes.
+
 ### Step 5: Verify Plugin Registration
 
 Check `__init__.py`'s `register()` function — all imported names from the
@@ -129,7 +173,9 @@ try/except ImportError), test both paths.
 
 ## Quick Audit Checklist
 
-- [ ] All method override signatures match parent
+- [ ] All method override signatures match parent (including return types and new params)
+- [ ] No `method=` kwargs passed to parent methods that upstream split into separate functions
+- [ ] No return type divergence on methods defined in both plugin and parent
 - [ ] All `from X import Y` paths resolve
 - [ ] All `gateway.run` internal attributes (`_session_*`, `_evict_*`) exist
 - [ ] All tool utility imports (`tools.clarify_gateway`, `tools.approval`) resolve

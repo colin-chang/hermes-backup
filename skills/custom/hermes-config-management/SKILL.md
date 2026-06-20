@@ -110,17 +110,24 @@ git diff config.yaml  # 确认 diff 只包含预期变更
    - `_config_version: 28`
    - 模型目录自动发现的新模型（如 `claude-fable-5`）— **需逐个人工评估是否保留**
    > 📌 **兼容性确认**：旧 `custom_providers` 数组格式仍被 Hermes 完整支持（`get_compatible_custom_providers` 同时读取新旧格式并去重合并）。勿「迁移」到 `providers` 字典格式。详见 `references/custom-providers-backward-compat.md`。
-4. 使用 `terminal` + Python heredoc 精确注入（`write_file` 和 `patch` 工具都会拒绝编辑 config.yaml）
+- 快捷入口：`DEFAULT_CONFIG` 从 `hermes_cli/config.py` 第 **883** 行开始（见 `references/default-config-quick-ref.md`）
+- ⚠️ 行号随版本漂移，始终以 `grep -n 'DEFAULT_CONFIG = {' hermes_cli/config.py` 定位为准
 5. **清除 Desktop 写入的所有默认值**（核心原则：配置只保留非默认值）：
-   - 对照 `hermes_cli/config.py` 中的 `DEFAULT_CONFIG` 逐一核实
-   - Desktop 典型写入的默认值（必须移除）：
-     - `credential_pool_strategies: {}`
-     - `code_execution.mode: project`
-     - `streaming.cursor: " ▉"`
-     - `approvals.mcp_reload_confirm: true`
-     - `onboarding.profile_build: ask`
-     - `_config_version: 28`
-   - 命令：`grep -n '"<key>":' hermes_cli/config.py` 定位默认值定义行，比对当前值
+- 对照 `hermes_cli/config.py` 中的 `DEFAULT_CONFIG` 逐一核实
+- Desktop 典型写入的默认值（必须移除）：
+  - `credential_pool_strategies: {}`
+  - `code_execution.mode: project`
+  - `streaming.cursor: " ▉"`
+  - `approvals.mcp_reload_confirm: true`
+  - `onboarding.profile_build: ask`
+  - `_config_version: 28`
+  - `agent.reasoning_effort: medium`（不在 DEFAULT_CONFIG["agent"] 中，但 `cfg_get` 运行时默认返回 `"medium"`）
+  - `mcp_servers.<name>.enabled: true`（`mcp_config.py` 中 `cfg.get("enabled", True)` 默认 True）
+- 命令：`grep -n '"<key>":' hermes_cli/config.py` 定位默认值定义行，比对当前值
+- **进阶**：部分配置项不在 `DEFAULT_CONFIG` 字典中但有运行时默认值，`grep DEFAULT_CONFIG` 找不到，需额外检查：
+  - `cfg_get` 的 docstring 示例（`grep -n 'cfg_get.*<key>' hermes_cli/config.py`）中的 `default=` 参数揭示运行时默认
+  - 实际调用点源码（如 `mcp_config.py` 中 `cfg.get("enabled", True)`）
+  - 辅助函数行为（如 `hermes_constants.py` 的 `parse_reasoning_effort("")` 返回 `None`，但 UI 和 `cfg_get` 默认 `"medium"`）
    - 快捷入口：`DEFAULT_CONFIG` 从 `hermes_cli/config.py` 第 **803** 行开始（见 `references/default-config-quick-ref.md`）
 6. 验证：`hermes config check`
 

@@ -14,7 +14,7 @@ ORIGIN=$(git rev-parse origin/main)    # e.g. aa32edcac...
 
 | # | 文件 | check_pattern | old_string 仍存在? | 结论 |
 |---|------|--------------|:---:|------|
-| 1 | `hermes_cli/model_switch.py` | `and not models_list` |   |   |
+| 1 | `hermes_cli/model_switch.py` | `skip live /models discovery when` |   |   |
 | 2 | `hermes_cli/model_switch.py` | `curated list takes priority over live discovery` |   |   |
 | 3 | `cron/jobs.py` | `ensure_ascii=False` |   |   |
 | 4 | `gateway/stream_consumer.py` | `Accumulate commentary` |   |   |
@@ -266,3 +266,60 @@ P5 原为双部分 patch：Part A 修复 `_progress_thread_id`，Part B 修复 `
 2. 更改 check_pattern 以匹配剩余部分的唯一代码（优先插入新注释）
 3. 更新 Header 描述和验证标注
 4. **不要**保持旧的 check_pattern 而去掉对应的 old_string——那会导致 check 永远失败
+
+## 示例：2026-06-20 验证记录
+
+- **Hermes 版本**：v2026.6.19-51-gb88d0007c9（上次验证 v2026.6.5-1117，+168 commits）
+- **origin/main**：b88d0007c9
+- **验证方式**：execute_code 批量脚本（9 个 patch 一次性双维度检查）
+- **结果**：
+  - 9/9 check_pattern 未命中 → 全部未合入
+  - 8/9 old_string 仍存在 → 可 apply
+  - **1 个需重写**：P1 `model_switch.py`（user providers 白名单）
+
+### P1 重写详情：内联中间变量引入重构
+
+**触发 commit**：`1039e90b5 fix(model-switch): probe /v1/models for providers without api_key`
+
+上游将 user providers 区域的单行条件 `if api_url and api_key and discover:` 重构为带 `has_explicit_models` 中间变量的多行表达式。这是与「委托函数提取」「兄弟参数包装器」不同的第三种 old_string 断裂模式——上游在原地用新变量重写了条件逻辑。
+
+**上游新代码**：
+```python
+            has_explicit_models = bool(models_list)
+            should_probe = bool(api_url) and discover and (
+                bool(api_key) or not has_explicit_models
+            )
+            if should_probe:
+```
+
+**关键风险**：上游的新逻辑 `bool(api_key) or not has_explicit_models` 意为「有 api_key 就总是探测」——这正是我们 patch 要修复的问题（ZenMux 聚合器有 api_key + 配了 `models:` 白名单子集，上游用 `/models` 完整目录覆盖了白名单）。上游注释明确写道 `With an api_key: always probe`，这是 aggregator-gateway 场景的设计意图，但与「尊重用户显式列表」的需求矛盾。
+
+**重写方案**：利用上游引入的 `has_explicit_models` 变量重新表达修复逻辑：
+
+新 old_string（匹配上游当前代码）：
+```python
+            has_explicit_models = bool(models_list)
+            should_probe = bool(api_url) and discover and (
+                bool(api_key) or not has_explicit_models
+            )
+            if should_probe:
+```
+
+新 new_string（有显式列表就不探测）：
+```python
+            has_explicit_models = bool(models_list)
+            # Curated list takes priority — skip live /models discovery when
+            # the user supplied an explicit models list, regardless of api_key.
+            # Prevents aggregator endpoints from overwriting a curated subset
+            # with their full catalog.
+            should_probe = bool(api_url) and discover and not has_explicit_models
+            if should_probe:
+```
+
+新 check_pattern：`skip live /models discovery when`（与 P2 的 `curated list takes priority over live discovery` 不冲突）。
+
+**逻辑改进**：新逻辑 `not has_explicit_models` 比旧 patch 的 `api_key and not models_list` 更优——保留了裸端点（Ollama/llama.cpp，无 api_key）的探测能力。对比 P2（custom_providers）现有 patch 逻辑 `bool(api_key) and not grp["models"]`，两者目标相同但 P2 仍要求 api_key；后续可考虑将 P2 也改为 `not grp["models"]` 以保持两区域一致。
+
+### 验证表格更新
+
+P1 重写后 check_pattern 从 `and not models_list` 变更为 `skip live /models discovery when`，更新本文件顶部表格第 1 行。

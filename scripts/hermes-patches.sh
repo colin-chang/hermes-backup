@@ -27,19 +27,19 @@
 #     ⚠️  Mattermost 专属修复           — 已迁移至 mattermost-enhancer 插件脚本
 #
 #   版本感知：
-#     最后验证: 2026-06-17
-#     Hermes 版本: v2026.6.5-1117-g17251e865 (origin/main)
+#     最后验证: 2026-06-20
+#     Hermes 版本: v2026.6.19-51-gb88d0007c9 (origin/main)
 #     验证方式: 双重验证（check_pattern + old_string match）
 #
-#   已验证（v2026.6.5-1117 / origin:main=17251e865）：
+#   已验证（v2026.6.19-51 / origin:main=b88d0007c9）：
 #     providers.py                          — ✅ 上游已合入，移除
 #     doctor.py                             — ✅ 上游已合入，移除
-#     model_switch.py (user providers)      — ❌ 未合入，old_string ✅ 仍匹配
+#     model_switch.py (user providers)      — ❌ 未合入，old_string ✅ 已重写（上游重构为 should_probe + has_explicit_models）
 #     model_switch.py (custom_providers)    — ❌ 未合入，old_string ✅ 仍匹配
 #     cron/jobs.py                          — ❌ 未合入，old_string ✅ 仍匹配
 #     stream_consumer.py (commentary)       — ❌ 未合入，old_string ✅ 仍匹配
 #     base.py (ghost fence)                 — ❌ 未合入，old_string ✅ 仍匹配
-#     stream_consumer.py (fallback thread)  — ❌ 未合入，old_string ✅ 已重写（上游改为 _metadata_for_send 包装）
+#     stream_consumer.py (fallback thread)  — ❌ 未合入，old_string ✅ 仍匹配
 #     utils.py (minimax tokens)             — ❌ 未合入，old_string ✅ 仍匹配
 #     run.py (P60a session source)          — ❌ 未合入，old_string ✅ 仍匹配
 #     run.py (P60b thread metadata)         — ❌ 未合入，old_string ✅ 仍匹配
@@ -74,7 +74,7 @@ error()  { echo -e "${RED}[ERROR]${NC} $1"; }
 # ═══════════════════════════════════════════════════════════════════════════
 
 _patch_registry=(
-    "hermes_cli/model_switch.py|Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）|and not models_list"
+    "hermes_cli/model_switch.py|Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）|skip live /models discovery when"
     "hermes_cli/model_switch.py|Fix: model whitelist ignored — custom_providers（同上 — custom_providers 白名单）|curated list takes priority over live discovery"
     "cron/jobs.py|Fix: Chinese text garbled in cron jobs（修复「定时任务中文变乱码」的问题）|ensure_ascii=False"
     "gateway/stream_consumer.py|Fix: commentary fragmentation（修复「回复碎成很多条消息」的问题）|Accumulate commentary"
@@ -146,38 +146,25 @@ apply_all() {
         # 1a. user providers
         _do_patch "hermes_cli/model_switch.py" \
             "Fix: model whitelist ignored — user providers（修复「模型白名单没生效」的问题）" \
-            'and not models_list' <<'PYEOF'
+            'skip live /models discovery when' <<'PYEOF'
 import sys
 file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     content = f.read()
 
-old = '''            # Prefer the endpoint's live /models list when credentials are
-            # available, unless the provider explicitly opts out via
-            # discover_models: false (e.g. dedicated endpoints that expose
-            # the entire aggregator catalog via /models).
-            api_key = str(ep_cfg.get("api_key", "") or "").strip()
-            if not api_key:
-                key_env = str(ep_cfg.get("key_env", "") or "").strip()
-                api_key = os.environ.get(key_env, "").strip() if key_env else ""
-            discover = ep_cfg.get("discover_models", True)
-            if isinstance(discover, str):
-                discover = discover.lower() not in {"false", "no", "0"}
-            if api_url and api_key and discover:'''
+old = '''            has_explicit_models = bool(models_list)
+            should_probe = bool(api_url) and discover and (
+                bool(api_key) or not has_explicit_models
+            )
+            if should_probe:'''
 
-new = '''            # Prefer the curated list when available; only fall back to
-            # live discovery if the user hasn't supplied an explicit list
-            # (via ``discover_models: false`` to suppress discovery on
-            # aggregator endpoints that expose their whole catalog via /models).
-            api_key = str(ep_cfg.get("api_key", "") or "").strip()
-            if not api_key:
-                key_env = str(ep_cfg.get("key_env", "") or "").strip()
-                api_key = os.environ.get(key_env, "").strip() if key_env else ""
-            discover = ep_cfg.get("discover_models", True)
-            if isinstance(discover, str):
-                discover = discover.lower() not in {"false", "no", "0"}
-            # Only run live discovery when there is no curated model list from config
-            if api_url and api_key and discover and not models_list:'''
+new = '''            has_explicit_models = bool(models_list)
+            # Curated list takes priority — skip live /models discovery when
+            # the user supplied an explicit models list, regardless of api_key.
+            # Prevents aggregator endpoints from overwriting a curated subset
+            # with their full catalog.
+            should_probe = bool(api_url) and discover and not has_explicit_models
+            if should_probe:'''
 
 if old in content:
     content = content.replace(old, new)

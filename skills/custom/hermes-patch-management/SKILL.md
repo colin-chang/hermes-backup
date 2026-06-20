@@ -175,12 +175,12 @@ PYEOF
 ### 4.3 后续动作
 
 - **已合入的 patch**（维度 A 命中 + 确认非假阳性）：立即从脚本中移除（registry + apply 代码 + check），减少维护负担。
-- **old_string 不匹配的 patch**（维度 B 失败）：重写 patch 的 old/new 字符串以适配新上游代码。
+- **old_string 不匹配的 patch**（维度 B 失败）：重写 patch 的 old/new 字符串以适配新上游代码。**重写原则**：优先利用上游引入的新结构（命名变量、辅助函数）重新表达修复逻辑，而非试图重建旧的内联逻辑。这样做（1）与上游方向一致，更容易最终被合入；（2）往往能改进修复本身（如 `not has_explicit_models` 比旧 `api_key and not models_list` 更正确——保留了裸端点探测能力）；（3）遵循上游命名约定，降低未来再次断裂的风险。
 - **验证完成**：更新脚本 Header 中的版本标注和逐 patch 验证结果。
 
 **验证清单模板**：见 `references/dual-check-verification.md`（含完整的 14-patch 核查表格和维度 A/B 命令模板）。
 
-**插件兼容性审计**：当自定义平台插件（如 mattermost-enhancer）需要随 Hermes 版本验证兼容性时，使用 `references/plugin-compatibility-audit.md` 中的 7 步审计方法论。
+**插件兼容性审计**：当自定义平台插件（如 mattermost-enhancer）需要随 Hermes 版本验证兼容性时，使用 `references/plugin-compatibility-audit.md` 中的 7 步审计方法论（含 method split / return type divergence / parameter drift 等新模式检测）。`references/mattermost-enhancer-audit-2026-06-20.md` 为一次完整审计的实例参考。
 
 **验证完成后，在脚本 Header 中标注验证结果**：
 ```bash
@@ -338,3 +338,5 @@ bash ~/.hermes/scripts/hermes-patches.sh check
 - **维度 B 的 `python3 -c` 假阴性**：§4.1 中推荐的 `git show ... | python3 -c "..."` 写法，当 old_string 包含反斜杠、引号或特殊字符时，bash 的双引号 `-c "..."` 会预先展开/转义部分内容，导致 Python 收到的字符串与预期不符 → 误报 `NO`。**解决方案**：改用文件中转——先将上游文件写入临时文件，再用独立的 Python heredoc（`<<'PYEOF'`）读取检查，彻底隔离 bash 转义。案例：Patch 8（fallback Thread 路由）的 old_string 在 pipe 方式下被误判为 SKIP，文件方式验证后确认 old_string 存在。
 - **Heredoc 双引号字符串中的 `\\n`（字面量反斜杠+n 陷阱）**：在 `<<'PYEOF'` heredoc 中，Python 代码保持字面。当使用双引号字符串 `"line1\\nline2"` 时，Python 中的 `\\n` 是转义序列，产生字面量两个字符 `\` + `n`，**而非换行符**。而 `old in content` 中的 `content`（读取自目标文件）包含真实换行符 `\n`（0x0a），因此匹配永远失败 → patch 静默 SKIP。**解决方案**：old/new 字符串一律使用三引号（`"""..."""` 或 `'''...'''`），内含真实换行符。**禁止**用双引号 `"..."` + `\\n` 构建多行字符串。案例：P3（Clarify 并发守护）的 old_string 用了 `"session_key = ...\\\\n        self._cache_session_source..."`，导致 `old in content` 从未命中，patch 始终被 `_do_patch` 误判为 SKIP（2026-06-08 修复）。
 - **old_string 上下文不匹配（静默 SKIP）**：构造 old_string 时假设了错误的周围代码行（如假设 `except Exception: pass` 紧邻目标行，但中间有 `session_entry = ...` 等额外语句），导致 `old in content` → `SKIP` → patch 静默未应用。**预防**：写 old_string 前用 `grep -B5 -A2` 读取真实周围代码，禁止凭记忆或第一次 apply 成功后的代码状态假设上下文。案例及详细验证方法见 `references/old-string-context-mismatch.md`。
+- **命名中间变量引入重构（named-intermediate-variable refactoring）**：上游在原地将单行条件（如 `if api_url and api_key and discover:`）重写为带命名中间变量的多行表达式（如 `has_explicit_models = bool(models_list)` + `should_probe = bool(api_url) and discover and (bool(api_key) or not has_explicit_models)`）。与「委托函数提取」（案例 C，代码迁移到新函数）和「兄弟参数包装器重构」（仅一个参数表达式变了）不同——这里的整体代码结构未变、未迁移到新函数，但条件逻辑被完全重写并引入了新变量名。特征：维度 B 失败，但 `git show` 显示代码仍在同一个函数的同一位置，只是条件表达式形状变了。**修复方法**：用上游新代码作为新 old_string，利用新引入的变量重新表达修复逻辑（如 `not has_explicit_models` 替代旧 `api_key and not models_list`）。案例：P1（model_switch.py user providers），commit `1039e90b5`。
+- **内联中间变量引入重构（inline intermediate variable）**：上游在原条件表达式前引入新的中间变量（如 `has_explicit_models = bool(models_list)`），并用该变量重组多行条件——old_string 断裂但代码结构形状相似。与「委托函数提取」（Case C/D）和「兄弟参数包装器」不同：没有提取到命名函数，也没有替换参数表达式，而是**在原地用新变量重写了条件逻辑**。**关键风险**：上游重组可能**改变了条件语义**——例如上游改为 `bool(api_key) or not has_explicit_models`（有 key 就总是探测），与我们 patch 的「有显式列表就不探测」目标相反。重写时应**利用上游引入的新变量**（如 `not has_explicit_models`）重新表达修复逻辑，而非试图重建旧的条件表达式。案例：P1（model_switch.py user providers），上游 commit `1039e90b5` 引入 `has_explicit_models`，详见 `references/dual-check-verification.md` 2026-06-20 记录。
