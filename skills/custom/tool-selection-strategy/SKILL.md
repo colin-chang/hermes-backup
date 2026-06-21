@@ -6,8 +6,13 @@ metadata:
   hermes:
     tags: [tool-selection, web-search, dokobot, browser-automation, opencli, fallback, priority]
 ---
+# 工具选择策略（Hermes 适配版）
 
-# 工具选择策略
+> **共享内核**：`/Users/Colin/.agents/skills/tool-selection-strategy/SKILL.md`
+> 本文件为 Hermes 专用适配层。通用决策逻辑（路径分离、降级链思想、封闭平台模式、Dokobot 原理）见共享内核。
+> 此处仅保留 Hermes 特有的工具映射、调用语法和配置概念。
+
+
 
 ## 核心原则
 
